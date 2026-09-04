@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.0
+
+**Nuevo**
+
+- **Solapa Control: un control remoto virtual.** Elegís el equipo y te aparecen sus botones
+  en grande, para disparar de un toque. Pensado para usar desde el celular, separado de la
+  planilla, que es para administrar.
+- Cada botón se pone en verde cuando el código salió, o en rojo si falló: un control remoto
+  no informa nada, así que sin esto una pulsación que no hizo nada se ve igual que una que
+  funcionó.
+- Un doble toque no dispara el código dos veces. En un portón eso significaría abrirlo y
+  cerrarlo enseguida.
+- Cada botón indica si es IR, RF 433 o RF 315.
+
 ## 0.6.0
 
 **Nuevo**

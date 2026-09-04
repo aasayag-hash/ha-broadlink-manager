@@ -538,6 +538,99 @@ form select {
   margin-top: 12px;
 }
 
+/* Virtual remote ---------------------------------------------------------- */
+
+.control-panel {
+  background: var(--surface);
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.control-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.control-head h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.control-select {
+  padding: 6px 9px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  max-width: 260px;
+}
+
+#control-pad {
+  display: grid;
+  /* Buttons stay finger-sized and reflow instead of shrinking: this is the
+     tab meant to be used from a phone. */
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+  max-width: 620px;
+}
+
+.pad-btn {
+  padding: 16px 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  min-height: 58px;
+  word-break: break-word;
+  /* Faster than the default so a rapid sequence of presses still reads as
+     separate taps. */
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.pad-btn:hover {
+  border-color: var(--accent);
+  background: #f5fbff;
+}
+
+.pad-btn:active {
+  background: #d4ecf9;
+}
+
+/* Held briefly after a send so a press is visibly acknowledged: the hardware
+   itself gives no feedback. */
+.pad-btn.sent {
+  background: var(--ok-bg);
+  color: var(--ok);
+  border-color: #bfe3c8;
+}
+
+.pad-btn.failed {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-color: #f5c6c2;
+}
+
+.pad-btn:disabled {
+  opacity: 1; /* not a disabled look: it is mid-send, not unavailable */
+}
+
+.pad-kind {
+  display: block;
+  font-size: 0.66rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.pad-btn.sent .pad-kind,
+.pad-btn.failed .pad-kind {
+  color: inherit;
+}
+
 /* Codes table ------------------------------------------------------------- */
 
 .codes-toolbar {

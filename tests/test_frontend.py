@@ -98,6 +98,43 @@ def test_destructive_actions_ask_first(js):
     assert js.count("window.confirm") >= 3
 
 
+# --- virtual remote --------------------------------------------------------
+
+
+def test_the_remote_has_its_own_tab(html):
+    """Kept apart from the codes table: that one is for administration."""
+    assert 'data-tab="control"' in html
+    assert 'id="tab-control"' in html
+
+
+def test_a_double_tap_cannot_fire_a_code_twice(js):
+    """On a gate that would open and immediately close it."""
+    send = re.search(r"async function sendFromPad.*?\n\}", js, re.DOTALL).group(0)
+    assert "sending.has(key)" in send
+    assert "sending.add(key)" in send
+    assert "sending.delete(key)" in send
+
+
+def test_a_press_is_acknowledged_visually(js):
+    """The hardware reports nothing, so a press that did nothing would look
+    exactly like one that worked."""
+    send = re.search(r"async function sendFromPad.*?\n\}", js, re.DOTALL).group(0)
+    assert '"sent"' in send and '"failed"' in send
+    assert "setTimeout" in send
+
+
+def test_switching_device_resets_the_remote_group(js):
+    """Otherwise the selector keeps a group that belongs to the old device."""
+    handler = re.search(r'closest\("\.device-card"\).*?\n  \}\);', js, re.DOTALL).group(0)
+    assert "controlGroup = null" in handler
+
+
+def test_the_remote_sends_through_the_existing_endpoint(js):
+    """Sending goes through Home Assistant, not straight to the hardware."""
+    send = re.search(r"async function sendFromPad.*?\n\}", js, re.DOTALL).group(0)
+    assert "api/codes/" in send and "/send" in send
+
+
 # --- wizard state, from bugs found in review -------------------------------
 
 

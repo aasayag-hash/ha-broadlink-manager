@@ -29,6 +29,7 @@ function initTabs() {
       btn.classList.add("active");
       $(`#tab-${btn.dataset.tab}`).classList.add("active");
       if (btn.dataset.tab === "aprender") renderLearn();
+      if (btn.dataset.tab === "control") loadControl();
       if (btn.dataset.tab === "codigos") loadCodes();
       if (btn.dataset.tab === "entidades") {
         // Entities are built from stored codes, so the table has to be loaded
@@ -168,9 +169,12 @@ function initDeviceList() {
     if (wizard) exitWizard();
 
     selectedMac = card.dataset.mac;
+    // The remote's group belongs to the previous device; renderControl picks a
+    // valid one again once the new device's codes are in.
+    controlGroup = null;
     renderDevices();
     renderLearn();
-    loadCodes();
+    loadCodes().then(renderControl);
   });
 }
 
@@ -797,6 +801,108 @@ async function extractDetail(res) {
   return detail;
 }
 
+// --- virtual remote ---------------------------------------------------------
+
+let controlGroup = null;
+// Buttons mid-send, so a double tap does not fire the code twice.
+const sending = new Set();
+
+const FEEDBACK_MS = 900;
+
+async function loadControl() {
+  await loadCodes();
+  renderControl();
+}
+
+function renderControl() {
+  const select = $("#control-group");
+  const pad = $("#control-pad");
+  const hint = $("#control-hint");
+
+  if (!selectedMac) {
+    select.innerHTML = "";
+    pad.innerHTML = "";
+    hint.textContent = "Elegí un dispositivo en la pestaña Dispositivos.";
+    return;
+  }
+  if (!codeGroups.length) {
+    select.innerHTML = "";
+    pad.innerHTML = "";
+    hint.textContent =
+      "Este dispositivo todavía no tiene códigos. Aprendé alguno desde la pestaña Aprender.";
+    return;
+  }
+
+  // Keep the current selection across refreshes; fall back to the first group.
+  if (!codeGroups.some((g) => g.subdevice === controlGroup)) {
+    controlGroup = codeGroups[0].subdevice;
+  }
+  select.innerHTML = codeGroups
+    .map(
+      (g) =>
+        `<option value="${escapeHtml(g.subdevice)}"${
+          g.subdevice === controlGroup ? " selected" : ""
+        }>${escapeHtml(g.subdevice)} (${g.commands.length})</option>`
+    )
+    .join("");
+
+  const group = codeGroups.find((g) => g.subdevice === controlGroup);
+  hint.textContent = "Tocá un botón para enviarlo al equipo.";
+  pad.innerHTML = group.commands
+    .map(
+      (c) => `
+      <button type="button" class="pad-btn" data-command="${escapeHtml(c.command)}">
+        ${escapeHtml(c.command)}
+        ${c.kind ? `<span class="pad-kind">${escapeHtml(c.kind)}</span>` : ""}
+      </button>`
+    )
+    .join("");
+}
+
+async function sendFromPad(button) {
+  const command = button.dataset.command;
+  const key = `${controlGroup}/${command}`;
+  // A second tap while the first is still in flight would fire the code twice,
+  // which on a gate means opening and immediately closing it.
+  if (sending.has(key)) return;
+  sending.add(key);
+  button.disabled = true;
+
+  try {
+    const res = await fetch(`${API_BASE}api/codes/${encodeURIComponent(selectedMac)}/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subdevice: controlGroup, command }),
+    });
+    const ok = res.ok;
+    // The hardware gives no feedback, so the button itself has to say something
+    // happened -- otherwise a press that did nothing looks the same as one that
+    // worked.
+    button.classList.add(ok ? "sent" : "failed");
+    if (!ok) window.alert(await extractDetail(res));
+    setTimeout(() => button.classList.remove("sent", "failed"), FEEDBACK_MS);
+  } catch (err) {
+    button.classList.add("failed");
+    window.alert(`No se pudo enviar: ${err}`);
+    setTimeout(() => button.classList.remove("failed"), FEEDBACK_MS);
+  } finally {
+    sending.delete(key);
+    button.disabled = false;
+  }
+}
+
+function initControl() {
+  $("#control-group").addEventListener("change", (event) => {
+    controlGroup = event.target.value;
+    renderControl();
+  });
+
+  $("#control-pad").addEventListener("click", (event) => {
+    const button = event.target.closest(".pad-btn");
+    if (button) sendFromPad(button);
+  });
+}
+
 // --- template wizard --------------------------------------------------------
 
 let templates = null;
@@ -1394,6 +1500,7 @@ function init() {
   initTabs();
   initDeviceList();
   initCodes();
+  initControl();
   initLearn();
   initTransfer();
   initWizard();

@@ -39,6 +39,7 @@ Este add-on hace los cinco pasos desde una pantalla.
 | 📡 **Aprende IR y RF** | Asistente paso a paso con cuenta regresiva. El barrido de frecuencia con instrucciones claras en cada fase. |
 | 🧩 **Plantillas por equipo** | Elegís "televisor" o "portón" y te va pidiendo los botones esperados, ya nombrados y agrupados. |
 | 🏷️ **Identifica el tipo** | Cada código indica si es IR, RF 433 o RF 315, leído del código en sí. |
+| 📱 **Control remoto virtual** | Los botones de un equipo en grande, para disparar de un toque desde el celular. |
 | 📋 **Planilla por equipo** | Probar, renombrar, mover entre equipos y borrar. Muestra también lo que aprendiste antes por otros medios. |
 | 🔌 **Crea entidades** | Botones e interruptores que aparecen solos en Home Assistant, sin reiniciar ni tocar YAML. |
 | 📤 **Exporta e importa** | Respaldo en JSON legible, o llevar un mando aprendido a otra instalación. |
@@ -138,7 +139,26 @@ así que agregar una es un archivo y no un cambio de código:
 }
 ```
 
-### 3. Códigos
+### 3. Control
+
+El control remoto virtual: elegís el equipo y sus botones aparecen en grande para disparar
+de un toque. Es la solapa para usar todos los días, y anda bien desde el celular.
+
+```
+Control remoto      [ TV Living (6) ▾ ]
+
+┌──────────┐ ┌──────────┐ ┌──────────┐
+│  power   │ │  vol_up  │ │ vol_down │
+│    IR    │ │    IR    │ │    IR    │
+└──────────┘ └──────────┘ └──────────┘
+```
+
+Cada botón se pone en verde cuando el código salió, o en rojo si falló — el equipo no
+informa nada, así que sin eso una pulsación que no hizo nada se vería igual que una que
+funcionó. Un doble toque tampoco dispara dos veces: en un portón eso sería abrirlo y
+cerrarlo enseguida.
+
+### 4. Códigos
 
 La planilla, agrupada por equipo y con buscador:
 
@@ -169,7 +189,7 @@ automático, o para llevar el mando a otra instalación) e **importar** un archi
 importar te muestra qué códigos son nuevos y cuáles ya existen, y para los repetidos elegís
 si dejar los tuyos, guardar los dos o reemplazarlos.
 
-### 4. Entidades
+### 5. Entidades
 
 Convertí un código en un **botón**, o un par de códigos en un **interruptor**. Aparecen al
 instante en Home Assistant, agrupados bajo el dispositivo Broadlink, sin reiniciar nada.
