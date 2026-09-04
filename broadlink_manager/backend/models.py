@@ -16,39 +16,62 @@ RF_CAPABLE_CLASSES = {"rm", "rmpro", "rm4", "rm4pro"}
 # processes taking turns on the same device socket is a known source of
 # connection errors.
 STATE_READABLE_CLASSES = {
-    "sp1",
+    # check_power / get_energy
     "sp2",
     "sp2s",
     "sp3",
     "sp3s",
     "sp4",
     "sp4b",
-    "bg1",
     "mp1",
     "mp1s",
+    # check_sensors
     "a1",
-    "a2",
-    "hysen",
-    "hvac",
     "rmpro",
     "rm4mini",
     "rm4pro",
+    # get_state: whole parameter sets (hvac) or a power state
+    "bg1",
+    "hvac",
+    "lb1",
+    "lb2",
+    "s3",
+    "ehc31",
+    # get_full_status
+    "hysen",
 }
+
+# Families the library recognises but exposes no reader for. Listed so the UI
+# can say so instead of showing an empty row that looks like a failure.
+# Verified against python-broadlink 0.19: no check_sensors, check_power,
+# get_state or get_full_status on any of these.
+NO_STATE_CLASSES = {"dooya", "dooya2", "wser", "s1c", "a2", "sp1", "rmmini", "rmminib"}
 
 # Why a device cannot learn, phrased for the user. Keyed by class name prefix so
 # a whole family shares one explanation.
 NO_LEARN_REASONS: dict[str, str] = {
     "sp": "Es un enchufe: no tiene códigos para aprender. Home Assistant ya lo controla.",
-    "bg": "Es un enchufe: no tiene códigos para aprender. Home Assistant ya lo controla.",
+    "bg": "Es un enchufe con panel: no tiene códigos para aprender. Home Assistant ya lo controla.",
     "mp": "Es una zapatilla: no tiene códigos para aprender. Home Assistant ya la controla.",
-    "a1": "Es un sensor ambiental: no emite ni recibe códigos.",
-    "a2": "Es un sensor ambiental: no emite ni recibe códigos.",
+    "a1": "Es un sensor ambiental: no emite ni recibe códigos. Se muestran sus lecturas.",
+    "a2": (
+        "Es un sensor ambiental: no emite ni recibe códigos. La librería todavía no expone "
+        "sus lecturas, así que solo se lista."
+    ),
     "hysen": "Es un termostato: Home Assistant ya lo controla como entidad climate.",
     "hvac": "Es un aire acondicionado: Home Assistant ya lo controla como entidad climate.",
-    "dooya": "Es un motor de persiana: no tiene códigos para aprender.",
-    "lb": "Es una lámpara: no tiene códigos para aprender.",
+    "dooya": (
+        "Es un motor de cortina: se comunica por su propio protocolo, no con códigos RF que "
+        "se puedan aprender. Home Assistant ya lo controla como entidad cover."
+    ),
+    "wser": (
+        "Es un motor de cortina: se comunica por su propio protocolo, no con códigos RF que "
+        "se puedan aprender. Home Assistant ya lo controla como entidad cover."
+    ),
+    "lb": "Es una lámpara: no tiene códigos para aprender. Home Assistant ya la controla.",
     "s1c": "Es un kit de alarma: no tiene códigos para aprender.",
-    "s3": "Es un hub: no tiene códigos para aprender.",
+    "s3": "Es un hub: no tiene códigos para aprender. Home Assistant ya lo controla.",
+    "ehc31": "Es un enchufe: no tiene códigos para aprender. Home Assistant ya lo controla.",
 }
 
 

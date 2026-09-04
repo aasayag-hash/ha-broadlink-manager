@@ -117,6 +117,10 @@
               autocomplete="off"
             />
             <span id="codes-count" class="codes-count"></span>
+            <span class="toolbar-spacer"></span>
+            <button type="button" id="btn-export" class="secondary">Exportar</button>
+            <button type="button" id="btn-import" class="secondary">Importar</button>
+            <input type="file" id="import-file" accept=".json,application/json" hidden />
           </div>
           <div id="codes-groups"></div>
         </div>
@@ -207,6 +211,39 @@
           </div>
         </div>
       </section>
+
+      <div id="import-modal" class="modal hidden">
+        <div class="modal-content">
+          <h2>Importar c&oacute;digos</h2>
+          <p id="import-error" class="error hidden"></p>
+          <div id="import-summary"></div>
+          <div id="import-conflict-options" class="hidden">
+            <p class="field-hint">
+              Algunos c&oacute;digos ya existen con ese nombre. &iquest;Qu&eacute; hacemos?
+            </p>
+            <label class="checkbox-label">
+              <input type="radio" name="import-mode" value="skip" checked />
+              Dejar los que ya tengo
+            </label>
+            <label class="checkbox-label">
+              <input type="radio" name="import-mode" value="rename" />
+              Guardar los dos (al nuevo se le agrega un n&uacute;mero)
+            </label>
+            <label class="checkbox-label">
+              <input type="radio" name="import-mode" value="overwrite" />
+              Reemplazar por los del archivo
+              <small class="field-hint">
+                Ojo: las automatizaciones que usen esos c&oacute;digos van a disparar la
+                se&ntilde;al nueva.
+              </small>
+            </label>
+          </div>
+          <div class="actions">
+            <button type="button" id="import-confirm">Importar</button>
+            <button type="button" id="import-cancel" class="secondary">Cancelar</button>
+          </div>
+        </div>
+      </div>
 
       <div id="edit-modal" class="modal hidden">
         <div class="modal-content">

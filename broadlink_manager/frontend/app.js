@@ -731,6 +731,144 @@ async function extractDetail(res) {
   return detail;
 }
 
+// --- export / import --------------------------------------------------------
+
+let pendingImport = null;
+
+async function exportCodes() {
+  if (!selectedMac) return;
+  const res = await fetch(`${API_BASE}api/export/${encodeURIComponent(selectedMac)}`);
+  if (!res.ok) {
+    window.alert(await extractDetail(res));
+    return;
+  }
+  const data = await res.json();
+  if (!Object.keys(data.devices).length) {
+    window.alert("Este dispositivo no tiene códigos para exportar.");
+    return;
+  }
+
+  // Built client-side into a blob: the file never has to come back through the
+  // ingress proxy as a download, which is where content-disposition gets lost.
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  const stamp = new Date().toISOString().slice(0, 10);
+  link.download = `broadlink-codigos-${stamp}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function onImportFileChosen(event) {
+  const file = event.target.files[0];
+  event.target.value = ""; // so choosing the same file again still fires
+  if (!file || !selectedMac) return;
+
+  let payload;
+  try {
+    payload = JSON.parse(await file.text());
+  } catch (err) {
+    window.alert(`El archivo no es un JSON válido: ${err.message}`);
+    return;
+  }
+
+  const res = await fetch(
+    `${API_BASE}api/import/${encodeURIComponent(selectedMac)}/preview`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ payload }),
+    }
+  );
+  if (!res.ok) {
+    window.alert(await extractDetail(res));
+    return;
+  }
+
+  pendingImport = payload;
+  renderImportPreview(await res.json());
+  $("#import-modal").classList.remove("hidden");
+}
+
+function renderImportPreview(preview) {
+  $("#import-error").classList.add("hidden");
+  $("#import-summary").innerHTML =
+    `<p>El archivo trae <strong>${preview.total}</strong> código${
+      preview.total === 1 ? "" : "s"
+    }.</p>` +
+    preview.groups
+      .map(
+        (g) => `
+      <div class="import-group">
+        <span class="import-group-name">${escapeHtml(g.subdevice)}</span>
+        ${g.new.length ? `<span class="import-new"> · ${g.new.length} nuevo(s)</span>` : ""}
+        ${
+          g.conflicting.length
+            ? `<span class="import-conflict"> · ${g.conflicting.length} ya existe(n): ${escapeHtml(
+                g.conflicting.join(", ")
+              )}</span>`
+            : ""
+        }
+      </div>`
+      )
+      .join("");
+
+  // The mode only matters when something would be overwritten.
+  $("#import-conflict-options").classList.toggle("hidden", !preview.conflicts);
+}
+
+async function confirmImport() {
+  if (!pendingImport) return;
+  const button = $("#import-confirm");
+  const mode =
+    document.querySelector("input[name=import-mode]:checked")?.value || "skip";
+
+  button.disabled = true;
+  button.textContent = "Importando…";
+  try {
+    const res = await fetch(`${API_BASE}api/import/${encodeURIComponent(selectedMac)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ payload: pendingImport, mode }),
+    });
+    if (!res.ok) {
+      const el = $("#import-error");
+      el.textContent = await extractDetail(res);
+      el.classList.remove("hidden");
+      return;
+    }
+    const result = await res.json();
+    $("#import-modal").classList.add("hidden");
+    pendingImport = null;
+
+    const parts = [
+      result.added.length ? `${result.added.length} agregado(s)` : null,
+      result.overwritten.length ? `${result.overwritten.length} reemplazado(s)` : null,
+      result.renamed.length ? `${result.renamed.length} guardado(s) con otro nombre` : null,
+      result.skipped.length ? `${result.skipped.length} salteado(s)` : null,
+    ].filter(Boolean);
+    window.alert(`Importación terminada: ${parts.join(", ") || "sin cambios"}.`);
+    loadCodes();
+  } finally {
+    button.disabled = false;
+    button.textContent = "Importar";
+  }
+}
+
+function initTransfer() {
+  $("#btn-export").addEventListener("click", exportCodes);
+  $("#btn-import").addEventListener("click", () => $("#import-file").click());
+  $("#import-file").addEventListener("change", onImportFileChosen);
+  $("#import-confirm").addEventListener("click", confirmImport);
+  $("#import-cancel").addEventListener("click", () => {
+    $("#import-modal").classList.add("hidden");
+    pendingImport = null;
+  });
+}
+
 // --- entities ---------------------------------------------------------------
 
 let mqttStatus = { status: "unknown", error: null };
@@ -944,6 +1082,7 @@ function init() {
   initDeviceList();
   initCodes();
   initLearn();
+  initTransfer();
   initEntities();
   $("#btn-scan").addEventListener("click", runScan);
   $("#add-device-form").addEventListener("submit", submitAddDevice);

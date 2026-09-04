@@ -66,4 +66,71 @@ def read_state(raw: Any) -> tuple[dict[str, Any] | None, str | None]:
         except Exception:  # noqa: BLE001 - many models advertise this and then refuse it
             pass
 
+    # get_state() covers the families check_sensors/check_power miss: hvac
+    # returns the unit's whole parameter set, while lb1/lb2, bg1, s3 and ehc31
+    # return a power state. Without this they showed up with no readings at all.
+    get_state = getattr(raw, "get_state", None)
+    if callable(get_state) and not state:
+        try:
+            for key, value in _flatten_state(get_state()).items():
+                state[key] = value
+        except Exception as exc:  # noqa: BLE001
+            return None, f"No se pudo leer el estado: {exc}"
+
+    # Hysen thermostats name it differently.
+    full_status = getattr(raw, "get_full_status", None)
+    if callable(full_status) and not state:
+        try:
+            for key, value in _flatten_state(full_status()).items():
+                state[key] = value
+        except Exception as exc:  # noqa: BLE001
+            return None, f"No se pudo leer el termostato: {exc}"
+
     return (state or None), None
+
+
+def _flatten_state(raw_state: Any) -> dict[str, Any]:
+    """Turn whatever get_state() returned into labelled display values.
+
+    Shapes vary by family: a dict of parameters (hvac, hysen), a bare bool
+    (lb1, s3), or an int. Only the keys worth showing are kept -- a thermostat
+    returns two dozen fields, most of them scheduling internals nobody reads in
+    an inventory list.
+    """
+    if isinstance(raw_state, bool):
+        return {"Estado": "encendido" if raw_state else "apagado"}
+    if isinstance(raw_state, int):
+        return {"Estado": "encendido" if raw_state else "apagado"}
+    if not isinstance(raw_state, dict):
+        return {"Estado": str(raw_state)}
+
+    labels = {
+        "pwr": ("Estado", None),
+        "power": ("Estado", None),
+        "state": ("Estado", None),
+        "temp": ("Temperatura", "°C"),
+        "room_temp": ("Temperatura", "°C"),
+        "thermostat_temp": ("Consigna", "°C"),
+        "external_temp": ("Temperatura externa", "°C"),
+        "target_temp": ("Consigna", "°C"),
+        "mode": ("Modo", None),
+        "fixation_v": ("Aletas", None),
+        "fanspeed": ("Ventilador", None),
+        "speed": ("Velocidad", None),
+        "brightness": ("Brillo", "%"),
+        "colortemp": ("Temperatura de color", "K"),
+        "hue": ("Tono", None),
+        "saturation": ("Saturación", "%"),
+    }
+
+    out: dict[str, Any] = {}
+    for key, value in raw_state.items():
+        entry = labels.get(str(key).lower())
+        if entry is None:
+            continue
+        label, unit = entry
+        if label == "Estado" and isinstance(value, (bool, int)) and not isinstance(value, str):
+            out[label] = "encendido" if value else "apagado"
+        else:
+            out[label] = f"{value} {unit}".strip() if unit else value
+    return out

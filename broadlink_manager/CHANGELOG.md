@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.5.0
+
+**Nuevo**
+
+- **Exportar e importar códigos** en un archivo JSON legible. Sirve de respaldo aparte del
+  automático, y para llevar un mando ya aprendido a otra instalación. Se puede exportar
+  todo o solo algunos equipos.
+- Antes de importar se muestra **qué va a pasar**: cuántos códigos son nuevos y cuáles ya
+  existen con ese nombre. Si hay conflictos podés elegir entre dejar los tuyos, guardar los
+  dos (al nuevo se le agrega un número) o reemplazarlos.
+- Se rechazan los archivos que no son un export de este add-on, los de una versión más
+  nueva y los que traen códigos mal formados, antes de tocar nada.
+
+**Corregido**
+
+- Faltaba leer el estado de seis familias que la librería sí expone: aires acondicionados
+  (`hvac`), lámparas (`lb1`, `lb2`), enchufes con panel (`bg1`, `ehc31`) y hubs (`s3`).
+  Aparecían en la lista sin ninguna lectura, como si no respondieran.
+- Los motores de cortina (`dooya`, `wser`) ahora explican por qué no tienen códigos para
+  aprender: usan su propio protocolo y Home Assistant ya los maneja como entidad `cover`.
+
+**Detalle**
+
+- Quedan cubiertas las **27 familias y 137 modelos** que reconoce la librería: cada una
+  declara exactamente lo que se le puede leer o aprender, verificado con tests.
+
 ## 0.4.0
 
 **Nuevo**

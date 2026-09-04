@@ -20,6 +20,7 @@ from . import (
     learning,
     settings_store,
     storage,
+    transfer,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -83,6 +84,12 @@ class MqttSettingsIn(BaseModel):
     username: str | None = None
     password: str | None = None
     ssl: bool = False
+
+
+class ImportIn(BaseModel):
+    payload: dict[str, Any]
+    # skip / overwrite / rename, for codes whose name is already taken.
+    mode: str = transfer.MODE_SKIP
 
 
 class CreateEntityIn(BaseModel):
@@ -325,6 +332,32 @@ def save_learned(mac: str, payload: SaveLearnedIn) -> dict[str, Any]:
     frequency = session.frequency
     learning.clear(mac)
     return {"ok": True, "frequency": frequency}
+
+
+@app.get("/api/export/{mac}")
+def export_codes(mac: str, subdevices: str | None = None) -> dict[str, Any]:
+    """Export every code, or only the equipment named in a comma-separated list."""
+    wanted = [s for s in (subdevices or "").split(",") if s.strip()] or None
+    try:
+        return transfer.export_codes(mac, wanted)
+    except (storage.StorageError, transfer.TransferError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/import/{mac}/preview")
+def preview_import(mac: str, payload: ImportIn) -> dict[str, Any]:
+    try:
+        return transfer.preview_import(mac, payload.payload)
+    except (storage.StorageError, transfer.TransferError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/import/{mac}")
+def import_codes(mac: str, payload: ImportIn) -> dict[str, Any]:
+    try:
+        return transfer.import_codes(mac, payload.payload, payload.mode)
+    except (storage.StorageError, transfer.TransferError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/api/mqtt")

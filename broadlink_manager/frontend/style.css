@@ -421,6 +421,56 @@ form select {
   font-size: 0.85rem;
 }
 
+/* Pushes the export/import buttons to the right edge of the toolbar. */
+.toolbar-spacer {
+  flex: 1;
+}
+
+.codes-toolbar button {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  flex: none;
+}
+
+#import-summary {
+  margin: 10px 0;
+  font-size: 0.85rem;
+}
+
+.import-group {
+  padding: 5px 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  background: #fafbfc;
+  margin-bottom: 5px;
+}
+
+.import-group-name {
+  font-weight: 600;
+}
+
+.import-new {
+  color: var(--ok);
+}
+
+.import-conflict {
+  color: var(--warn);
+}
+
+#import-error.hidden,
+#import-conflict-options.hidden {
+  display: none;
+}
+
+#import-error {
+  background: var(--danger-bg);
+  border: 1px solid #f5c6c2;
+  border-radius: 4px;
+  padding: 8px 10px;
+  margin: 0 0 10px 0;
+  font-size: 0.85rem;
+}
+
 .code-group {
   margin-bottom: 10px;
   border: 1px solid var(--border);

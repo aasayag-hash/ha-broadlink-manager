@@ -40,6 +40,7 @@ Este add-on hace los cinco pasos desde una pantalla.
 | 🏷️ **Identifica el tipo** | Cada código indica si es IR, RF 433 o RF 315, leído del código en sí. |
 | 📋 **Planilla por equipo** | Probar, renombrar, mover entre equipos y borrar. Muestra también lo que aprendiste antes por otros medios. |
 | 🔌 **Crea entidades** | Botones e interruptores que aparecen solos en Home Assistant, sin reiniciar ni tocar YAML. |
+| 📤 **Exporta e importa** | Respaldo en JSON legible, o llevar un mando aprendido a otra instalación. |
 | 💾 **Cuida tus datos** | Respaldo antes de cada modificación y escritura atómica. |
 
 ## Requisitos
@@ -78,9 +79,20 @@ RM mini 3    192.168.1.41    ● online
 
 SP4          192.168.1.55    ● online   ·  Estado: encendido
   ✗ Es un enchufe: no tiene códigos para aprender. Home Assistant ya lo controla.
+
+A1 sensor    192.168.1.60    ● online   ·  Temperatura: 24.3 °C · Humedad: 47 %
+  ✗ Es un sensor ambiental: no emite ni recibe códigos. Se muestran sus lecturas.
 ```
 
 Si tu Broadlink está en otra VLAN o en una red donde no llega el broadcast, agregalo por IP.
+
+**Qué reconoce.** Las 27 familias y 137 modelos que soporta
+[python-broadlink](https://github.com/mjg59/python-broadlink): controles RM, enchufes SP,
+sensores ambientales A1, zapatillas MP1, lámparas LB1/LB2, termostatos Hysen, aires HVAC,
+motores de cortina Dooya, hubs S3 y más. Solo la familia RM aprende códigos; del resto se
+muestran las lecturas que la librería expone (temperatura, humedad, encendido, consumo,
+consigna), en modo **solo lectura** — Home Assistant ya los controla nativamente, y dos
+procesos peleando por el mismo socket es una causa conocida de desconexiones.
 
 ### 2. Aprender
 
@@ -119,6 +131,11 @@ data:
   device: Portón
   command: abrir
 ```
+
+Desde la barra de esa pestaña podés **exportar** todo a un JSON legible (respaldo aparte del
+automático, o para llevar el mando a otra instalación) e **importar** un archivo. Antes de
+importar te muestra qué códigos son nuevos y cuáles ya existen, y para los repetidos elegís
+si dejar los tuyos, guardar los dos o reemplazarlos.
 
 ### 4. Entidades
 
