@@ -122,6 +122,107 @@ def test_publish_without_a_connection_raises_rather_than_silently_failing():
         publisher.publish("x/y", "payload")
 
 
+# --- connection lifecycle --------------------------------------------------
+
+
+class SpyClient:
+    """Stands in for mqtt.Client, recording teardown calls."""
+
+    instances: list["SpyClient"] = []
+
+    def __init__(self, client_id=None):
+        self.client_id = client_id
+        self.stopped = False
+        self.disconnected = False
+        self.on_disconnect = None
+        SpyClient.instances.append(self)
+
+    def username_pw_set(self, *a):
+        pass
+
+    def tls_set(self, *a):
+        pass
+
+    def connect_async(self, *a, **kw):
+        pass
+
+    def loop_start(self):
+        pass
+
+    def subscribe(self, *a):
+        pass
+
+    def loop_stop(self):
+        self.stopped = True
+
+    def disconnect(self):
+        self.disconnected = True
+
+
+@pytest.fixture()
+def spy_client(monkeypatch):
+    SpyClient.instances = []
+    monkeypatch.setattr(entities.mqtt, "Client", SpyClient)
+    return SpyClient
+
+
+def test_reopening_closes_the_previous_client(spy_client):
+    """Each rebuild must tear the old client down first.
+
+    Dropping the reference alone leaves paho's network thread and socket alive.
+    Since every client shares one id, the newcomer then kicks the leaked one off
+    the broker (rc=7), which fires _handle_disconnect and schedules another
+    reconnect -- a self-sustaining loop where each leaked client is still
+    subscribed to the command topic, so one press fires several times.
+    Reproduced against a real broker: three reconnects leaked eight threads.
+    """
+    publisher = entities.MqttPublisher()
+    config = {"host": "h", "port": 1883}
+
+    publisher._open(config)
+    publisher._open(config)
+    publisher._open(config)
+
+    assert len(spy_client.instances) == 3
+    # Every client but the current one is fully torn down.
+    for client in spy_client.instances[:-1]:
+        assert client.stopped and client.disconnected
+    assert not spy_client.instances[-1].stopped
+
+
+def test_teardown_does_not_trigger_its_own_reconnect(spy_client):
+    """A disconnect we asked for must not schedule a reconnect."""
+    publisher = entities.MqttPublisher()
+    publisher._open({"host": "h", "port": 1883})
+    first = spy_client.instances[0]
+    assert first.on_disconnect is not None
+
+    publisher._open({"host": "h", "port": 1883})
+    assert first.on_disconnect is None
+
+
+def test_stop_closes_the_client(spy_client):
+    publisher = entities.MqttPublisher()
+    publisher._open({"host": "h", "port": 1883})
+    publisher.stop()
+
+    assert spy_client.instances[0].stopped
+    assert publisher.status == "disconnected"
+
+
+def test_start_clears_a_stale_connected_flag(spy_client, monkeypatch):
+    """A leftover flag would report success for a connection that never happened."""
+    monkeypatch.setattr(entities, "broker_config", lambda: ({"host": "h", "port": 1883}, None))
+    monkeypatch.setattr(entities, "CONNECT_TIMEOUT", 0.2)
+
+    publisher = entities.MqttPublisher()
+    publisher._connected.set()  # as if a previous session had connected
+
+    ok, error = publisher.start(lambda *a: None)
+    assert ok is False
+    assert "No se pudo conectar" in error
+
+
 # --- broker settings -------------------------------------------------------
 
 

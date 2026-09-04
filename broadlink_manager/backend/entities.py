@@ -114,6 +114,10 @@ class MqttPublisher:
 
         self._on_command = on_command
         self._stop = False
+        # Cleared before connecting: a leftover flag from a previous session
+        # would make the wait below return instantly and report success for a
+        # connection that never happened.
+        self._connected.clear()
         with self._lock:
             self._open(config)
 
@@ -124,7 +128,32 @@ class MqttPublisher:
             )
         return True, None
 
+    def _close_client(self) -> None:
+        """Tear down the current client, if any.
+
+        Must run before building a replacement. Dropping the reference alone
+        leaves paho's network thread and socket alive, and since every client
+        shares one id the newcomer kicks the leaked one off the broker, which
+        fires _handle_disconnect and schedules yet another reconnect. Measured:
+        three reconnects leaked eight threads and turned into a self-sustaining
+        loop, with each still subscribed to the command topic, so one button
+        press fired several times.
+        """
+        client, self._client = self._client, None
+        if client is None:
+            return
+        # No _handle_disconnect for a teardown we asked for: it would schedule a
+        # reconnect against the client we are replacing.
+        client.on_disconnect = None
+        try:
+            client.loop_stop()
+            client.disconnect()
+        except Exception as exc:  # noqa: BLE001 - best effort teardown
+            logger.debug("Error cerrando el cliente MQTT anterior: %s", exc)
+
     def _open(self, config: dict[str, Any]) -> None:
+        self._close_client()
+
         # A fixed client id keeps one session per add-on; a random one would
         # leave orphaned sessions on the broker after every restart.
         client = mqtt.Client(client_id="broadlink_manager")
@@ -220,12 +249,11 @@ class MqttPublisher:
             raise MqttError("El broker no confirmó la publicación.")
 
     def stop(self) -> None:
+        # Set before taking the lock so a retry already waiting on it exits
+        # instead of opening one more client behind us.
         self._stop = True
         with self._lock:
-            if self._client is not None:
-                self._client.loop_stop()
-                self._client.disconnect()
-                self._client = None
+            self._close_client()
         self._connected.clear()
         self._status = "disconnected"
 

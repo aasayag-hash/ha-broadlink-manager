@@ -209,8 +209,10 @@ def send_code(mac: str, payload: SendCodeIn) -> dict[str, bool]:
     """
     entity_id = payload.entity_id
     if not entity_id:
-        entities = ha_api.list_remote_entities()
-        if not entities:
+        # Not named `entities`: that is the module imported at the top, and
+        # shadowing it here would break any later use of it in this handler.
+        remotes = ha_api.list_remote_entities()
+        if not remotes:
             raise HTTPException(
                 status_code=400,
                 detail=(
@@ -219,7 +221,7 @@ def send_code(mac: str, payload: SendCodeIn) -> dict[str, bool]:
                     "probar códigos desde acá."
                 ),
             )
-        entity_id = entities[0]
+        entity_id = remotes[0]
 
     ok, error = ha_api.send_command(entity_id, payload.subdevice, payload.command)
     if not ok:
