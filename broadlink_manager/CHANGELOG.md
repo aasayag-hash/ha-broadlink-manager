@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.1
+
+**Mejorado**
+
+- El README explica cómo se relacionan las cinco solapas: un diagrama del recorrido, un
+  cuadro de qué necesita y qué deja cada una, y un árbol de decisión en cada sección con las
+  dudas más comunes ("no aparece mi Broadlink", "dice MQTT no conectado").
+
 ## 0.7.0
 
 **Nuevo**
