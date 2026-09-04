@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.6.0
+
+**Nuevo**
+
+- **Asistente por tipo de equipo.** En vez de aprender botones sueltos y ordenarlos
+  después, elegís qué es (televisor, aire, portón, ventilador, luces RF), le ponés nombre y
+  la app te va pidiendo los botones uno por uno. Al terminar quedan todos agrupados y
+  nombrados igual.
+- El asistente marca en verde lo que ya aprendiste y resalta el siguiente que falta, pero
+  te deja elegir cualquiera: no obliga a un orden.
+- Se puede salir y volver más tarde — recuerda lo hecho leyendo los códigos guardados, así
+  que también cuenta lo que aprendiste fuera del asistente.
+- Los botones opcionales están marcados como tales: con los básicos ya tenés el equipo
+  andando.
+- Las plantillas avisan lo que conviene saber de cada tipo: que un aire manda su estado
+  completo en cada pulsación (y por eso hace falta un código por combinación, no uno de
+  "subir"), o que la mayoría de los portones usan un solo botón para abrir, parar y cerrar.
+
+**Corregido**
+
+- El `Dockerfile` no copiaba las plantillas al contenedor, así que el asistente no habría
+  encontrado ninguna una vez instalado.
+
 ## 0.5.0
 
 **Nuevo**

@@ -12,6 +12,9 @@ RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 
 COPY backend /app/backend
 COPY frontend /app/frontend
+# device_templates.py resolves this relative to the backend package, so the
+# directory has to land next to it or the wizard finds no templates at all.
+COPY templates /app/templates
 COPY run.sh /run.sh
 RUN chmod a+x /run.sh
 

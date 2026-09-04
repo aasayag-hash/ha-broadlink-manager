@@ -241,16 +241,22 @@ function renderLearn() {
   if (!device) {
     info.textContent = "Elegí un dispositivo en la pestaña Dispositivos para empezar.";
     $("#learn-start").classList.add("hidden");
+    $("#wizard-picker").classList.add("hidden");
     return;
   }
   if (!device.capabilities.learn_ir) {
     info.textContent = `${device.model}: ${device.capabilities.no_learn_reason}`;
     $("#learn-start").classList.add("hidden");
+    $("#wizard-picker").classList.add("hidden");
     return;
   }
 
   info.textContent = `${device.model} · ${device.host}`;
   $("#learn-start").classList.remove("hidden");
+  if (!wizard) {
+    $("#wizard-picker").classList.remove("hidden");
+    loadTemplates();
+  }
   $("#btn-learn-rf").classList.toggle("hidden", !device.capabilities.learn_rf);
 
   const freq = knownFrequency[selectedMac];
@@ -310,6 +316,11 @@ function renderLearnState(session) {
   $("#learn-start").classList.toggle("hidden", active || captured);
   $("#learn-progress").classList.toggle("hidden", !active);
   $("#learn-result").classList.toggle("hidden", !captured && !finished);
+  // The template picker would be noise while a capture is running; the wizard
+  // panel stays visible so the user keeps sight of what is left.
+  if (!wizard) {
+    $("#wizard-picker").classList.toggle("hidden", active || captured);
+  }
 
   if (active) {
     $("#learn-state").textContent =
@@ -337,6 +348,13 @@ function renderLearnState(session) {
     $("#save-group-options").innerHTML = codeGroups
       .map((g) => `<option value="${escapeHtml(g.subdevice)}"></option>`)
       .join("");
+
+    // In the wizard both names are already decided, so they are filled in and
+    // the user only has to test and save.
+    if (wizard && wizard.pending) {
+      $("#save-group").value = wizard.group;
+      $("#save-command").value = wizard.pending.command;
+    }
     return;
   }
 
@@ -383,8 +401,16 @@ async function submitSave(event) {
   const data = await res.json();
   if (data.frequency) knownFrequency[selectedMac] = data.frequency;
   resetLearn();
-  renderLearn();
-  loadCodes();
+
+  // The codes table has to be reloaded before the wizard redraws: it is what
+  // tells the wizard which buttons are done.
+  await loadCodes();
+  if (wizard) {
+    wizard.pending = null;
+    renderWizard();
+  } else {
+    renderLearn();
+  }
 }
 
 function initLearn() {
@@ -396,6 +422,12 @@ function initLearn() {
       method: "POST",
     });
     resetLearn();
+    // Discarding drops the pending button but stays in the wizard, so the user
+    // can retry it or pick a different one.
+    if (wizard) {
+      wizard.pending = null;
+      renderWizard();
+    }
   });
 
   $("#btn-learn-cancel").addEventListener("click", async () => {
@@ -748,6 +780,141 @@ async function extractDetail(res) {
     void err;
   }
   return detail;
+}
+
+// --- template wizard --------------------------------------------------------
+
+let templates = null;
+// The wizard in progress: which template, which equipment name, and which
+// button is being captured right now.
+let wizard = null;
+
+async function loadTemplates() {
+  if (templates === null) {
+    const res = await fetch(`${API_BASE}api/templates`);
+    templates = res.ok ? await res.json() : [];
+  }
+  $("#template-list").innerHTML = templates
+    .map((t) => {
+      const required = t.buttons.filter((b) => !b.optional).length;
+      return `
+      <button type="button" class="template-card" data-id="${escapeHtml(t.id)}">
+        <span class="template-name">${t.icon} ${escapeHtml(t.name)}</span>
+        <span class="template-count">${required} básicos · ${t.buttons.length} en total</span>
+      </button>`;
+    })
+    .join("");
+}
+
+async function startWizard(templateId) {
+  const name = window.prompt(
+    "¿Cómo querés llamar a este equipo?\n\nVa a agrupar todos sus botones con ese nombre.",
+    ""
+  );
+  if (!name || !name.trim()) return;
+
+  const res = await fetch(
+    `${API_BASE}api/templates/${encodeURIComponent(templateId)}/${encodeURIComponent(selectedMac)}`
+  );
+  if (!res.ok) {
+    window.alert(await extractDetail(res));
+    return;
+  }
+  const data = await res.json();
+  wizard = { template: data.template, group: name.trim(), pending: null };
+  renderWizard();
+}
+
+function exitWizard() {
+  wizard = null;
+  $("#wizard-panel").classList.add("hidden");
+  $("#wizard-picker").classList.remove("hidden");
+  renderLearn();
+}
+
+function learnedCommands() {
+  // Read from the codes table rather than tracked separately, so a code
+  // captured outside the wizard also counts as done.
+  const group = codeGroups.find((g) => g.subdevice === wizard.group);
+  return new Set(group ? group.commands.map((c) => c.command) : []);
+}
+
+function renderWizard() {
+  if (!wizard) return;
+  const { template, group } = wizard;
+  const done = learnedCommands();
+
+  $("#wizard-picker").classList.add("hidden");
+  $("#wizard-panel").classList.remove("hidden");
+  $("#wizard-title").textContent = `${template.icon} ${template.name} · ${group}`;
+
+  const note = $("#wizard-note");
+  note.textContent = template.note || "";
+  note.classList.toggle("hidden", !template.note);
+
+  const required = template.buttons.filter((b) => !b.optional);
+  const doneRequired = required.filter((b) => done.has(b.command)).length;
+  $("#wizard-progress").textContent =
+    doneRequired === required.length
+      ? `Listo: los ${required.length} botones básicos están aprendidos. Podés seguir con los opcionales o salir.`
+      : `${doneRequired} de ${required.length} botones básicos. Tocá el que quieras aprender.`;
+
+  // The next unlearned required button is highlighted, so there is always an
+  // obvious next step without forcing a fixed order.
+  const next = template.buttons.find((b) => !b.optional && !done.has(b.command));
+
+  $("#wizard-buttons").innerHTML = template.buttons
+    .map((b) => {
+      const isDone = done.has(b.command);
+      const isNext = next && b.command === next.command;
+      const cls = isDone ? "done" : isNext ? "next" : "";
+      return `
+      <button type="button" class="wizard-btn ${cls}" data-command="${escapeHtml(
+        b.command
+      )}" data-label="${escapeHtml(b.label)}"${b.hint ? ` title="${escapeHtml(b.hint)}"` : ""}>
+        ${isDone ? "✓" : isNext ? "▸" : ""} ${escapeHtml(b.label)}
+        ${b.optional ? '<span class="wizard-optional">opcional</span>' : ""}
+      </button>`;
+    })
+    .join("");
+}
+
+async function wizardCapture(command, label) {
+  const device = devices.find((d) => d.mac === selectedMac);
+  if (!device) return;
+
+  // RF when the device can do it and the frequency is already known, so the
+  // second button of a remote does not sweep again; IR otherwise.
+  const mode = device.capabilities.learn_rf && knownFrequency[selectedMac] ? "rf" : null;
+  if (!mode) {
+    const chosen = device.capabilities.learn_rf
+      ? window.confirm(
+          `Aprender "${label}".\n\nOK = infrarrojo (control de TV, aire...)\nCancelar = radiofrecuencia (portón, luces 433...)`
+        )
+        ? "ir"
+        : "rf"
+      : "ir";
+    wizard.pending = { command, label };
+    await startLearn(chosen);
+    return;
+  }
+
+  wizard.pending = { command, label };
+  await startLearn("rf");
+}
+
+function initWizard() {
+  $("#template-list").addEventListener("click", (event) => {
+    const card = event.target.closest(".template-card");
+    if (card) startWizard(card.dataset.id);
+  });
+
+  $("#wizard-exit").addEventListener("click", exitWizard);
+
+  $("#wizard-buttons").addEventListener("click", (event) => {
+    const button = event.target.closest(".wizard-btn");
+    if (button) wizardCapture(button.dataset.command, button.dataset.label);
+  });
 }
 
 // --- model override ---------------------------------------------------------
@@ -1180,6 +1347,7 @@ function init() {
   initCodes();
   initLearn();
   initTransfer();
+  initWizard();
   initModelOverride();
   initEntities();
   $("#btn-scan").addEventListener("click", runScan);

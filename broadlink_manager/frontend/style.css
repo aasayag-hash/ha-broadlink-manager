@@ -358,6 +358,124 @@ form select {
   display: none;
 }
 
+/* Template wizard --------------------------------------------------------- */
+
+.template-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 16px 0;
+}
+
+.template-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 9px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text);
+  flex: 0 0 auto;
+  min-width: 150px;
+}
+
+.template-card:hover {
+  border-color: var(--accent);
+  background: #f5fbff;
+}
+
+.template-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.template-count {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.wizard-panel {
+  margin: 12px 0 16px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: #f5fbff;
+}
+
+.wizard-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.wizard-head span {
+  font-weight: 700;
+}
+
+.wizard-head button {
+  padding: 3px 9px;
+  font-size: 0.75rem;
+}
+
+.wizard-note {
+  margin: 0 0 8px 0;
+  padding: 7px 9px;
+  background: var(--warn-bg);
+  color: var(--warn);
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.wizard-note.hidden {
+  display: none;
+}
+
+.wizard-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.wizard-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  font-size: 0.8rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.wizard-btn:hover {
+  border-color: var(--accent);
+}
+
+.wizard-btn.done {
+  background: var(--ok-bg);
+  color: var(--ok);
+  border-color: #bfe3c8;
+}
+
+.wizard-btn.next {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.wizard-optional {
+  opacity: 0.75;
+  font-size: 0.72rem;
+}
+
 .learn-actions {
   display: flex;
   align-items: flex-start;

@@ -1,0 +1,22 @@
+{
+  "id": "tv",
+  "name": "Televisor",
+  "icon": "📺",
+  "description": "Los botones que más se usan de un control de TV.",
+  "buttons": [
+    { "command": "power", "label": "Encender / apagar", "hint": "El botón rojo de POWER." },
+    { "command": "vol_up", "label": "Volumen +" },
+    { "command": "vol_down", "label": "Volumen −" },
+    { "command": "mute", "label": "Silenciar" },
+    { "command": "channel_up", "label": "Canal +" },
+    { "command": "channel_down", "label": "Canal −" },
+    { "command": "input", "label": "Entrada / Source", "optional": true },
+    { "command": "menu", "label": "Menú", "optional": true },
+    { "command": "up", "label": "Arriba", "optional": true },
+    { "command": "down", "label": "Abajo", "optional": true },
+    { "command": "left", "label": "Izquierda", "optional": true },
+    { "command": "right", "label": "Derecha", "optional": true },
+    { "command": "ok", "label": "OK / Enter", "optional": true },
+    { "command": "back", "label": "Volver", "optional": true }
+  ]
+}

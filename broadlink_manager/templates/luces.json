@@ -1,0 +1,14 @@
+{
+  "id": "luces",
+  "name": "Luces RF",
+  "icon": "💡",
+  "description": "Controles de luces de 433 MHz, del tipo que viene con varios canales.",
+  "buttons": [
+    { "command": "encender", "label": "Encender" },
+    { "command": "apagar", "label": "Apagar" },
+    { "command": "brillo_mas", "label": "Más brillo", "optional": true },
+    { "command": "brillo_menos", "label": "Menos brillo", "optional": true },
+    { "command": "todo_encendido", "label": "Todo encendido", "optional": true },
+    { "command": "todo_apagado", "label": "Todo apagado", "optional": true }
+  ]
+}

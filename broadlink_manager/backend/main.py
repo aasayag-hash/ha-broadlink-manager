@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from . import (
     device_state,
+    device_templates,
     discovery,
     entities,
     entities_store,
@@ -361,6 +362,26 @@ def save_learned(mac: str, payload: SaveLearnedIn) -> dict[str, Any]:
     frequency = session.frequency
     learning.clear(mac)
     return {"ok": True, "frequency": frequency}
+
+
+@app.get("/api/templates")
+def list_templates() -> list[dict[str, Any]]:
+    """Presets that guide learning button by button, instead of one at a time."""
+    return device_templates.list_templates()
+
+
+@app.get("/api/templates/{template_id}/{mac}")
+def template_progress(template_id: str, mac: str) -> dict[str, Any]:
+    """A template plus which of its buttons are already learned.
+
+    Computed server-side against .storage so the wizard can be resumed later,
+    and so a code captured outside the wizard still counts as done.
+    """
+    template = device_templates.get_template(template_id)
+    if template is None:
+        raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+
+    return {"template": template, "groups": sorted(storage.read_codes(mac))}
 
 
 @app.get("/api/export/{mac}")

@@ -1,0 +1,14 @@
+{
+  "id": "ventilador",
+  "name": "Ventilador de techo",
+  "icon": "🌀",
+  "description": "Ventiladores de techo con control, y su luz si la tiene.",
+  "buttons": [
+    { "command": "power", "label": "Encender / apagar" },
+    { "command": "velocidad_1", "label": "Velocidad 1", "optional": true },
+    { "command": "velocidad_2", "label": "Velocidad 2", "optional": true },
+    { "command": "velocidad_3", "label": "Velocidad 3", "optional": true },
+    { "command": "luz", "label": "Luz", "optional": true },
+    { "command": "reversa", "label": "Reversa", "optional": true }
+  ]
+}

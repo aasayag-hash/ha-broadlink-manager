@@ -37,6 +37,7 @@ Este add-on hace los cinco pasos desde una pantalla.
 | 🔍 **Busca solo** | Encuentra todos los Broadlink de la red, incluso en otras interfaces. Alta manual por IP para VLANs y redes aisladas. |
 | 🎛️ **Muestra qué puede cada uno** | Un RM pro aprende IR y RF; un RM mini solo IR; un enchufe no tiene nada que aprender — y lo dice. |
 | 📡 **Aprende IR y RF** | Asistente paso a paso con cuenta regresiva. El barrido de frecuencia con instrucciones claras en cada fase. |
+| 🧩 **Plantillas por equipo** | Elegís "televisor" o "portón" y te va pidiendo los botones esperados, ya nombrados y agrupados. |
 | 🏷️ **Identifica el tipo** | Cada código indica si es IR, RF 433 o RF 315, leído del código en sí. |
 | 📋 **Planilla por equipo** | Probar, renombrar, mover entre equipos y borrar. Muestra también lo que aprendiste antes por otros medios. |
 | 🔌 **Crea entidades** | Botones e interruptores que aparecen solos en Home Assistant, sin reiniciar ni tocar YAML. |
@@ -114,6 +115,28 @@ frecuencia de un control, los demás botones de ese mismo control se aprenden sa
 barrido — de unos 30 segundos a unos 3.
 
 Antes de guardar podés **probar el código** para confirmar que el aparato responde.
+
+**Con plantilla, más rápido.** Si vas a aprender un control entero, elegí qué tipo de equipo
+es (televisor, aire, portón, ventilador, luces RF), ponele nombre, y la app te va pidiendo
+los botones uno por uno — ya nombrados y agrupados. Marca en verde lo hecho y resalta el
+que sigue, pero podés ir en cualquier orden, salir y volver más tarde. Los botones
+opcionales están señalados: con los básicos ya tenés el equipo funcionando.
+
+Las plantillas son archivos JSON en [`broadlink_manager/templates/`](broadlink_manager/templates/),
+así que agregar una es un archivo y no un cambio de código:
+
+```json
+{
+  "id": "mi_equipo",
+  "name": "Mi equipo",
+  "icon": "🎵",
+  "note": "Un aviso que conviene leer antes de empezar (opcional).",
+  "buttons": [
+    { "command": "power", "label": "Encender / apagar", "hint": "El botón rojo." },
+    { "command": "extra", "label": "Algo que no todos tienen", "optional": true }
+  ]
+}
+```
 
 ### 3. Códigos
 
@@ -210,6 +233,7 @@ broadlink_manager/
 │   ├── storage.py         # El .storage de HA, con respaldo y escritura atómica
 │   ├── entities.py        # MQTT discovery
 │   └── main.py            # FastAPI
+├── templates/             # Plantillas de equipo, en JSON
 └── frontend/              # HTML + JS + CSS, sin build
 ```
 

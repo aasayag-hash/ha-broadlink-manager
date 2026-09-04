@@ -54,6 +54,24 @@
           <h2>Aprender un c&oacute;digo</h2>
           <p class="field-hint" id="learn-device"></p>
 
+          <div id="wizard-picker" class="hidden">
+            <p class="field-hint">
+              &iquest;Quer&eacute;s aprender un control entero? Eleg&iacute; qu&eacute; tipo de
+              equipo es y te voy pidiendo los botones uno por uno.
+            </p>
+            <div id="template-list" class="template-list"></div>
+          </div>
+
+          <div id="wizard-panel" class="wizard-panel hidden">
+            <div class="wizard-head">
+              <span id="wizard-title"></span>
+              <button type="button" id="wizard-exit" class="secondary">Salir del asistente</button>
+            </div>
+            <p id="wizard-note" class="wizard-note hidden"></p>
+            <p id="wizard-progress" class="field-hint"></p>
+            <div id="wizard-buttons" class="wizard-buttons"></div>
+          </div>
+
           <div id="learn-start" class="learn-actions hidden">
             <button type="button" id="btn-learn-ir">Aprender IR</button>
             <button type="button" id="btn-learn-rf">Aprender RF</button>

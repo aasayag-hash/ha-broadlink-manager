@@ -1,0 +1,19 @@
+{
+  "id": "aire",
+  "name": "Aire acondicionado",
+  "icon": "❄️",
+  "description": "Un código por combinación, porque un aire manda todo su estado en cada pulsación.",
+  "note": "Ojo: los aires no mandan \"subir un grado\", mandan el estado completo (modo + temperatura + ventilador). Por eso hay que aprender un código por cada combinación que quieras usar, no un botón de subir y otro de bajar.",
+  "buttons": [
+    { "command": "off", "label": "Apagar" },
+    { "command": "frio_24", "label": "Frío 24°" },
+    { "command": "frio_23", "label": "Frío 23°", "optional": true },
+    { "command": "frio_22", "label": "Frío 22°", "optional": true },
+    { "command": "frio_21", "label": "Frío 21°", "optional": true },
+    { "command": "frio_20", "label": "Frío 20°", "optional": true },
+    { "command": "calor_22", "label": "Calor 22°", "optional": true },
+    { "command": "calor_24", "label": "Calor 24°", "optional": true },
+    { "command": "ventilador", "label": "Solo ventilador", "optional": true },
+    { "command": "swing", "label": "Swing / aletas", "optional": true }
+  ]
+}

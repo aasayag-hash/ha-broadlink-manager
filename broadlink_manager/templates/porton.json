@@ -1,0 +1,14 @@
+{
+  "id": "porton",
+  "name": "Portón / barrera",
+  "icon": "🚪",
+  "description": "Portones de 433 MHz. Muchos usan un solo botón para todo.",
+  "note": "La mayoría de los portones tienen un único botón que abre, para y cierra por turnos. Si el tuyo es así, aprendé solo \"pulso\" y dejá el resto vacío.",
+  "buttons": [
+    { "command": "pulso", "label": "Botón único (abre / para / cierra)" },
+    { "command": "abrir", "label": "Abrir", "optional": true },
+    { "command": "cerrar", "label": "Cerrar", "optional": true },
+    { "command": "parar", "label": "Parar", "optional": true },
+    { "command": "peatonal", "label": "Puerta peatonal", "optional": true }
+  ]
+}
