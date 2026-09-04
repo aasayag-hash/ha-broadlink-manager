@@ -966,6 +966,13 @@ async function refreshWizardProgress(templateId) {
     }
     const data = await res.json();
     wizard.template = data.template;
+    if (!Array.isArray(data.learned)) {
+      // The endpoint omits the field when it was not asked about a group, so an
+      // absent one means "unknown", not "nothing learned". Treating it as empty
+      // would have the user re-capture codes that already exist.
+      window.alert("No se pudo leer qué botones ya están aprendidos. Probá de nuevo.");
+      return false;
+    }
     wizard.learned = data.learned;
     return true;
   } catch (err) {

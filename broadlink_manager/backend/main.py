@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import logging
 import threading
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -35,9 +36,24 @@ FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 STATE_POLL_SECONDS = 30
 RESCAN_SECONDS = 120
 
-app = FastAPI(title="Broadlink Manager")
-
 _shutdown = threading.Event()
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Start the background workers, and stop them on the way out.
+
+    A lifespan handler rather than @app.on_event, which FastAPI deprecated.
+    startup() and shutdown() stay separate functions so tests can replace them.
+    """
+    startup()
+    try:
+        yield
+    finally:
+        shutdown()
+
+
+app = FastAPI(title="Broadlink Manager", lifespan=lifespan)
 
 
 class AddDeviceIn(BaseModel):
@@ -386,13 +402,17 @@ def template_progress(template_id: str, mac: str, subdevice: str | None = None) 
     except storage.StorageError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    learned = sorted(codes.get(subdevice, {})) if subdevice else []
-    return {
-        "template": template,
-        "groups": sorted(codes),
-        # Which of this template's buttons already exist in that group.
-        "learned": [b["command"] for b in template["buttons"] if b["command"] in learned],
-    }
+    result: dict[str, Any] = {"template": template, "groups": sorted(codes)}
+
+    # Only answer about progress when asked about a specific group. Returning an
+    # empty list without one would assert "nothing learned", and a caller that
+    # believed it would have the user re-capture codes that already exist --
+    # which save_code then overwrites without asking.
+    if subdevice is not None:
+        learned = sorted(codes.get(subdevice, {}))
+        result["learned"] = [b["command"] for b in template["buttons"] if b["command"] in learned]
+
+    return result
 
 
 @app.get("/api/export/{mac}")
@@ -650,7 +670,6 @@ def _worker(name: str, interval: int, task) -> None:
                 logger.warning("%s falló: %s", name, exc)
 
 
-@app.on_event("startup")
 def startup() -> None:
     discovery.load_persisted()
 
@@ -671,7 +690,6 @@ def startup() -> None:
     ).start()
 
 
-@app.on_event("shutdown")
 def shutdown() -> None:
     _shutdown.set()
     entities.publisher.stop()
