@@ -331,6 +331,74 @@ form select {
   padding: 12px 4px;
 }
 
+/* Learn panel ------------------------------------------------------------- */
+
+.hidden {
+  display: none;
+}
+
+.learn-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.learn-progress,
+.learn-result {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fafbfc;
+}
+
+.progress-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.learn-countdown {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.learn-message {
+  margin: 10px 0 0 0;
+  font-size: 0.95rem;
+}
+
+.status-pill.waiting {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
+.status-pill.captured {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+
+.code-block {
+  background: #1c1e21;
+  color: #d4d4d4;
+  padding: 10px;
+  border-radius: 4px;
+  overflow-x: auto;
+  max-height: 110px;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 10px 0;
+}
+
+#save-form {
+  margin-top: 12px;
+}
+
 /* Codes table ------------------------------------------------------------- */
 
 .codes-toolbar {
@@ -437,6 +505,16 @@ table {
   font-family: var(--mono);
   font-size: 0.75rem;
   color: var(--text-muted);
+}
+
+.kind-tag {
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--neutral-bg);
+  color: var(--neutral);
+  font-size: 0.68rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .toggle-tag {

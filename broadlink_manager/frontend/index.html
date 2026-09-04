@@ -51,9 +51,57 @@
       <section id="tab-aprender" class="tab-panel">
         <div class="learn-panel">
           <h2>Aprender un c&oacute;digo</h2>
-          <p class="field-hint" id="learn-placeholder">
-            Eleg&iacute; un dispositivo en la pesta&ntilde;a Dispositivos para empezar.
-          </p>
+          <p class="field-hint" id="learn-device"></p>
+
+          <div id="learn-start" class="learn-actions hidden">
+            <button type="button" id="btn-learn-ir">Aprender IR</button>
+            <button type="button" id="btn-learn-rf">Aprender RF</button>
+            <label class="checkbox-label hidden" id="reuse-freq-label">
+              <input type="checkbox" id="reuse-freq" />
+              Usar la frecuencia ya detectada (<span id="known-freq"></span> MHz)
+              <small class="field-hint">
+                Saltea el barrido. Sirve para aprender varios botones del mismo control.
+              </small>
+            </label>
+          </div>
+
+          <div id="learn-progress" class="learn-progress hidden">
+            <div class="progress-head">
+              <span class="status-pill waiting" id="learn-state"></span>
+              <span id="learn-countdown" class="learn-countdown"></span>
+            </div>
+            <p id="learn-message" class="learn-message"></p>
+            <div class="actions">
+              <button type="button" id="btn-learn-cancel" class="secondary">Cancelar</button>
+            </div>
+          </div>
+
+          <div id="learn-result" class="learn-result hidden">
+            <p id="learn-result-message" class="learn-message"></p>
+            <p id="learn-error" class="error"></p>
+            <pre id="learn-code" class="code-block hidden"></pre>
+            <form id="save-form" class="hidden">
+              <label>
+                Equipo
+                <input type="text" id="save-group" list="save-group-options" required
+                       placeholder="TV Living, Port&oacute;n, Aire..." />
+                <datalist id="save-group-options"></datalist>
+              </label>
+              <label>
+                Nombre del bot&oacute;n
+                <input type="text" id="save-command" required placeholder="power, subir, abrir..." />
+              </label>
+              <p id="save-error" class="error hidden"></p>
+              <div class="actions">
+                <button type="button" id="btn-test-code" class="secondary">Probar</button>
+                <button type="submit">Guardar</button>
+                <button type="button" id="btn-discard" class="secondary">Descartar</button>
+              </div>
+            </form>
+            <div class="actions hidden" id="retry-actions">
+              <button type="button" id="btn-retry">Reintentar</button>
+            </div>
+          </div>
         </div>
       </section>
 

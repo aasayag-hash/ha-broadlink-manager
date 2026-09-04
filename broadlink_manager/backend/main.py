@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import logging
 import threading
 from pathlib import Path
@@ -10,7 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import device_state, discovery, ha_api, storage
+from . import device_state, discovery, ha_api, learning, storage
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("broadlink_manager.main")
@@ -53,6 +54,17 @@ class SendCodeIn(BaseModel):
     subdevice: str
     command: str
     entity_id: str | None = None
+
+
+class LearnIn(BaseModel):
+    mode: str  # "ir" or "rf"
+    # Skips the RF sweep when the frequency of this remote is already known.
+    frequency: float | None = None
+
+
+class SaveLearnedIn(BaseModel):
+    subdevice: str
+    command: str
 
 
 @app.get("/api/devices")
@@ -102,6 +114,7 @@ def list_codes(mac: str) -> dict[str, Any]:
                     # A two-item list means the command was learned with the
                     # 'alternative' flag: HA alternates between both on send.
                     "toggle": isinstance(code, list),
+                    "kind": learning.packet_kind(str(code[0] if isinstance(code, list) else code)),
                     "preview": (code[0] if isinstance(code, list) else str(code))[:24],
                 }
                 for command in sorted(commands)
@@ -189,6 +202,99 @@ def send_code(mac: str, payload: SendCodeIn) -> dict[str, bool]:
 @app.get("/api/remote-entities")
 def remote_entities() -> list[str]:
     return ha_api.list_remote_entities()
+
+
+def _require_device(mac: str):
+    """Return (device, handle) or raise with a message the user can act on."""
+    device = next((d for d in discovery.list_known() if d.mac == mac), None)
+    if device is None:
+        raise HTTPException(status_code=404, detail="Dispositivo no encontrado")
+    raw = discovery.get_handle(mac)
+    if raw is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "No hay conexión con el dispositivo. Buscá de nuevo desde la pestaña "
+                "Dispositivos para reconectarlo."
+            ),
+        )
+    return device, raw
+
+
+@app.post("/api/learn/{mac}")
+def start_learn(mac: str, payload: LearnIn) -> dict[str, Any]:
+    device, raw = _require_device(mac)
+    mode = payload.mode.lower()
+
+    if mode not in ("ir", "rf"):
+        raise HTTPException(status_code=400, detail="El modo debe ser 'ir' o 'rf'")
+    if mode == "ir" and not device.capabilities.learn_ir:
+        raise HTTPException(
+            status_code=400, detail=device.capabilities.no_learn_reason or "No aprende infrarrojo"
+        )
+    if mode == "rf" and not device.capabilities.learn_rf:
+        raise HTTPException(
+            status_code=400,
+            detail=device.capabilities.no_learn_reason or "Este modelo no tiene radio",
+        )
+
+    try:
+        session = learning.start(mac, raw, mode, payload.frequency)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return session.as_dict()
+
+
+@app.get("/api/learn/{mac}")
+def learn_status(mac: str) -> dict[str, Any]:
+    session = learning.get_session(mac)
+    if session is None:
+        return {"mac": mac, "state": learning.IDLE, "message": "", "error": None, "code": None}
+    return session.as_dict()
+
+
+@app.post("/api/learn/{mac}/cancel")
+def cancel_learn(mac: str) -> dict[str, bool]:
+    return {"ok": learning.cancel(mac)}
+
+
+@app.post("/api/learn/{mac}/test")
+def test_learned(mac: str) -> dict[str, bool]:
+    """Fire the just-captured code without saving it first.
+
+    This one goes straight to the hardware, unlike the codes table: the code is
+    not in .storage yet, so remote.send_command has nothing to reference.
+    """
+    _, raw = _require_device(mac)
+    session = learning.get_session(mac)
+    if session is None or not session.code:
+        raise HTTPException(status_code=400, detail="No hay ningún código capturado para probar")
+
+    try:
+        raw.send_data(base64.b64decode(session.code))
+    except Exception as exc:  # noqa: BLE001 - library raises its own tree
+        raise HTTPException(
+            status_code=502, detail=f"No se pudo enviar el código: {exc}"
+        ) from exc
+    return {"ok": True}
+
+
+@app.post("/api/learn/{mac}/save")
+def save_learned(mac: str, payload: SaveLearnedIn) -> dict[str, Any]:
+    session = learning.get_session(mac)
+    if session is None or not session.code:
+        raise HTTPException(status_code=400, detail="No hay ningún código capturado para guardar")
+
+    try:
+        storage.save_code(mac, payload.subdevice, payload.command, session.code)
+    except storage.StorageError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # Keep the frequency around: it lets the next button of the same remote skip
+    # the sweep, which is the difference between ~30 seconds and ~3.
+    frequency = session.frequency
+    learning.clear(mac)
+    return {"ok": True, "frequency": frequency}
 
 
 def _refresh_state() -> None:

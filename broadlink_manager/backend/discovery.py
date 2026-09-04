@@ -73,6 +73,22 @@ def _local_ipv4_addresses() -> list[str]:
     return sorted(addresses)
 
 
+def _hello_with_retries(ip: str, attempts: int = 2) -> Any | None:
+    """Try to reach one device directly, tolerating a missed reply.
+
+    A single timeout does not mean the device is gone: an RM pro answers
+    irregularly for a while after a learning session, so one retry avoids
+    flipping a perfectly healthy device to offline in the table.
+    """
+    for attempt in range(attempts):
+        try:
+            return broadlink.hello(ip, timeout=HELLO_TIMEOUT)
+        except Exception:  # noqa: BLE001 - unreachable is the normal case here
+            if attempt == attempts - 1:
+                return None
+    return None
+
+
 def _to_device(raw: Any, *, manual: bool = False) -> Device:
     device_class = type(raw).__name__
     host, port = raw.host if isinstance(raw.host, tuple) else (raw.host, 80)
@@ -137,11 +153,21 @@ def scan() -> list[Device]:
         _authenticate(device, raw)
         _remember(device, raw)
 
-    # Anything previously known that did not answer stays listed as offline.
+    # Anything previously known that did not answer the broadcast gets one
+    # direct attempt on its last known IP before being called offline. Observed
+    # on a real RM pro: after a learning session it stopped answering the
+    # broadcast entirely while still replying to hello() on its own address.
     with _devices_lock:
-        for mac, device in _devices.items():
-            if mac not in found:
-                device.online = False
+        missing = [d for mac, d in _devices.items() if mac not in found]
+
+    for device in missing:
+        raw = _hello_with_retries(device.host)
+        if raw is None:
+            device.online = False
+            continue
+        refreshed = _to_device(raw)
+        _authenticate(refreshed, raw)
+        _remember(refreshed, raw)
 
     _persist()
     return list_known()

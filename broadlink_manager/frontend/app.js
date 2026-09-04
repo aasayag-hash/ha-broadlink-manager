@@ -201,25 +201,202 @@ async function submitAddDevice(event) {
   await loadDevices();
 }
 
+// --- learning ---------------------------------------------------------------
+
+let learnTimer = null;
+// Remembered per device so the second button of a remote can skip the sweep.
+const knownFrequency = {};
+
+const ACTIVE_STATES = ["waiting_ir", "sweeping", "waiting_packet"];
+
 function renderLearn() {
-  const placeholder = $("#learn-placeholder");
+  const info = $("#learn-device");
   const device = devices.find((d) => d.mac === selectedMac);
 
   if (!device) {
-    placeholder.textContent = "Elegí un dispositivo en la pestaña Dispositivos para empezar.";
+    info.textContent = "Elegí un dispositivo en la pestaña Dispositivos para empezar.";
+    $("#learn-start").classList.add("hidden");
     return;
   }
   if (!device.capabilities.learn_ir) {
-    placeholder.textContent = `${device.model}: ${device.capabilities.no_learn_reason}`;
+    info.textContent = `${device.model}: ${device.capabilities.no_learn_reason}`;
+    $("#learn-start").classList.add("hidden");
     return;
   }
-  const modes = [
-    device.capabilities.learn_ir ? "IR" : null,
-    device.capabilities.learn_rf ? "RF" : null,
-  ]
-    .filter(Boolean)
-    .join(" y ");
-  placeholder.textContent = `${device.model} seleccionado. Puede aprender ${modes}. (Captura todavía no implementada.)`;
+
+  info.textContent = `${device.model} · ${device.host}`;
+  $("#learn-start").classList.remove("hidden");
+  $("#btn-learn-rf").classList.toggle("hidden", !device.capabilities.learn_rf);
+
+  const freq = knownFrequency[selectedMac];
+  $("#reuse-freq-label").classList.toggle("hidden", !freq || !device.capabilities.learn_rf);
+  if (freq) $("#known-freq").textContent = freq;
+
+  pollLearn();
+}
+
+async function startLearn(mode) {
+  const body = { mode };
+  if (mode === "rf" && $("#reuse-freq").checked && knownFrequency[selectedMac]) {
+    body.frequency = knownFrequency[selectedMac];
+  }
+
+  const res = await fetch(`${API_BASE}api/learn/${encodeURIComponent(selectedMac)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    window.alert(await extractDetail(res));
+    return;
+  }
+  renderLearnState(await res.json());
+  startLearnPolling();
+}
+
+function startLearnPolling() {
+  stopLearnPolling();
+  // Faster than the device list: a capture finishes in seconds and the
+  // countdown has to move, not jump.
+  learnTimer = setInterval(pollLearn, 700);
+}
+
+function stopLearnPolling() {
+  if (learnTimer) clearInterval(learnTimer);
+  learnTimer = null;
+}
+
+async function pollLearn() {
+  if (!selectedMac) return;
+  try {
+    const res = await fetch(`${API_BASE}api/learn/${encodeURIComponent(selectedMac)}`);
+    if (!res.ok) return;
+    renderLearnState(await res.json());
+  } catch (err) {
+    void err;
+  }
+}
+
+function renderLearnState(session) {
+  const active = ACTIVE_STATES.includes(session.state);
+  const captured = session.state === "captured";
+  const finished = ["failed", "cancelled"].includes(session.state);
+
+  $("#learn-start").classList.toggle("hidden", active || captured);
+  $("#learn-progress").classList.toggle("hidden", !active);
+  $("#learn-result").classList.toggle("hidden", !captured && !finished);
+
+  if (active) {
+    $("#learn-state").textContent =
+      session.state === "sweeping" ? "buscando frecuencia" : "esperando señal";
+    $("#learn-countdown").textContent = session.remaining ? `${session.remaining}s` : "";
+    $("#learn-message").textContent = session.message;
+    return;
+  }
+
+  stopLearnPolling();
+
+  if (captured) {
+    if (session.frequency) knownFrequency[selectedMac] = session.frequency;
+    // The kind comes from the captured bytes, not from the mode that was
+    // requested: an RF remote pointed at an RM pro is picked up by the IR flow
+    // too, and the user should see what was really captured.
+    $("#learn-result-message").textContent = session.kind
+      ? `${session.message} (tipo detectado: ${session.kind})`
+      : session.message;
+    $("#learn-error").textContent = "";
+    $("#learn-code").textContent = session.code;
+    $("#learn-code").classList.remove("hidden");
+    $("#save-form").classList.remove("hidden");
+    $("#retry-actions").classList.add("hidden");
+    $("#save-group-options").innerHTML = codeGroups
+      .map((g) => `<option value="${escapeHtml(g.subdevice)}"></option>`)
+      .join("");
+    return;
+  }
+
+  if (finished) {
+    $("#learn-result-message").textContent = session.state === "cancelled" ? session.message : "";
+    $("#learn-error").textContent = session.error || "";
+    $("#learn-code").classList.add("hidden");
+    $("#save-form").classList.add("hidden");
+    $("#retry-actions").classList.remove("hidden");
+  }
+}
+
+function resetLearn() {
+  stopLearnPolling();
+  $("#learn-result").classList.add("hidden");
+  $("#learn-progress").classList.add("hidden");
+  $("#learn-start").classList.remove("hidden");
+  $("#save-error").classList.add("hidden");
+  $("#save-group").value = "";
+  $("#save-command").value = "";
+}
+
+async function submitSave(event) {
+  event.preventDefault();
+  const errorEl = $("#save-error");
+  errorEl.classList.add("hidden");
+
+  const res = await fetch(`${API_BASE}api/learn/${encodeURIComponent(selectedMac)}/save`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      subdevice: $("#save-group").value,
+      command: $("#save-command").value,
+    }),
+  });
+
+  if (!res.ok) {
+    // Keep the form open on a validation error so nothing typed is lost.
+    errorEl.textContent = await extractDetail(res);
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
+  const data = await res.json();
+  if (data.frequency) knownFrequency[selectedMac] = data.frequency;
+  resetLearn();
+  renderLearn();
+  loadCodes();
+}
+
+function initLearn() {
+  $("#btn-learn-ir").addEventListener("click", () => startLearn("ir"));
+  $("#btn-learn-rf").addEventListener("click", () => startLearn("rf"));
+  $("#btn-retry").addEventListener("click", resetLearn);
+  $("#btn-discard").addEventListener("click", async () => {
+    await fetch(`${API_BASE}api/learn/${encodeURIComponent(selectedMac)}/cancel`, {
+      method: "POST",
+    });
+    resetLearn();
+  });
+
+  $("#btn-learn-cancel").addEventListener("click", async () => {
+    await fetch(`${API_BASE}api/learn/${encodeURIComponent(selectedMac)}/cancel`, {
+      method: "POST",
+    });
+    pollLearn();
+  });
+
+  $("#btn-test-code").addEventListener("click", async (event) => {
+    const button = event.target;
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = "Enviando…";
+    try {
+      const res = await fetch(`${API_BASE}api/learn/${encodeURIComponent(selectedMac)}/test`, {
+        method: "POST",
+      });
+      if (!res.ok) window.alert(await extractDetail(res));
+    } finally {
+      button.disabled = false;
+      button.textContent = original;
+    }
+  });
+
+  $("#save-form").addEventListener("submit", submitSave);
 }
 
 // --- codes -----------------------------------------------------------------
@@ -305,6 +482,9 @@ function renderCodes() {
           (c) => `
         <tr>
           <td>${escapeHtml(c.command)}</td>
+          <td>${
+            c.kind ? `<span class="kind-tag">${escapeHtml(c.kind)}</span>` : ""
+          }</td>
           <td class="code-preview">${escapeHtml(c.preview)}…</td>
           <td>${
             c.toggle
@@ -549,6 +729,7 @@ function init() {
   initTabs();
   initDeviceList();
   initCodes();
+  initLearn();
   $("#btn-scan").addEventListener("click", runScan);
   $("#add-device-form").addEventListener("submit", submitAddDevice);
 
