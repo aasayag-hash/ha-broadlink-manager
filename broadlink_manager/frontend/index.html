@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Broadlink Manager</title>
+    <link rel="stylesheet" href="static/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Broadlink Manager</h1>
+      <nav id="tabs">
+        <button class="tab-btn active" data-tab="dispositivos">Dispositivos</button>
+        <button class="tab-btn" data-tab="aprender">Aprender</button>
+        <button class="tab-btn" data-tab="codigos">C&oacute;digos</button>
+      </nav>
+    </header>
+
+    <main>
+      <section id="tab-dispositivos" class="tab-panel active">
+        <div class="devices-layout">
+          <div class="device-form-panel">
+            <h2>Agregar por IP</h2>
+            <p class="field-hint">
+              Us&aacute; esto solo si el dispositivo no aparece solo. El descubrimiento
+              autom&aacute;tico usa un broadcast que no cruza VLANs ni redes de invitados.
+            </p>
+            <form id="add-device-form">
+              <label>
+                IP del dispositivo
+                <input type="text" id="device-ip" placeholder="192.168.1.40" required />
+              </label>
+              <div class="actions">
+                <button type="submit" id="btn-add-device">Agregar</button>
+              </div>
+            </form>
+            <p id="add-device-error" class="error"></p>
+          </div>
+
+          <div class="device-list-panel">
+            <div class="panel-header">
+              <h2>Dispositivos encontrados</h2>
+              <button type="button" id="btn-scan">Buscar</button>
+            </div>
+            <p id="scan-status" class="field-hint"></p>
+            <ul id="device-list"></ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-aprender" class="tab-panel">
+        <div class="learn-panel">
+          <h2>Aprender un c&oacute;digo</h2>
+          <p class="field-hint" id="learn-placeholder">
+            Eleg&iacute; un dispositivo en la pesta&ntilde;a Dispositivos para empezar.
+          </p>
+        </div>
+      </section>
+
+      <section id="tab-codigos" class="tab-panel">
+        <div class="codes-panel">
+          <h2>C&oacute;digos guardados</h2>
+          <p class="field-hint">Todav&iacute;a no implementado.</p>
+        </div>
+      </section>
+    </main>
+
+    <script src="static/app.js"></script>
+  </body>
+</html>
