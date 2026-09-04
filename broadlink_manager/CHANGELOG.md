@@ -15,3 +15,7 @@
 - Estado en vivo de solo lectura para enchufes, sensores y termostatos, como inventario de
   lo que hay en la red.
 - Reescaneo automático en segundo plano y botón de búsqueda manual.
+- Los equipos con radio muestran las bandas que cubren: 433 MHz y 315 MHz. Es un dato
+  informativo del modelo, porque el descubrimiento no informa las bandas; la frecuencia
+  real de cada control se conoce recién al hacer el barrido.
+- Ícono y logo propios.

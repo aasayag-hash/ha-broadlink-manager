@@ -101,6 +101,11 @@ function renderDevices() {
               ? `<span class="device-reason">${escapeHtml(caps.no_learn_reason)}</span>`
               : ""
           }
+          ${
+            caps.rf_bands
+              ? `<span class="device-bands">Bandas RF: ${escapeHtml(caps.rf_bands)}</span>`
+              : ""
+          }
           ${stateHtml}
           ${
             device.last_error

@@ -52,6 +52,13 @@ NO_LEARN_REASONS: dict[str, str] = {
 }
 
 
+# Bands the RF-capable models cover. Shown for information only: the discovery
+# protocol reports model, MAC and IP and nothing about radio bands, so these are
+# a property of the model rather than something the device announces. The real
+# frequency of a remote is only known once sweep_frequency() finds it.
+RF_BANDS = "433 MHz (433,05-434,79) y 315 MHz (314,95-315,25)"
+
+
 class Capabilities(BaseModel):
     """What a discovered device can actually do.
 
@@ -67,6 +74,8 @@ class Capabilities(BaseModel):
     # Shown next to the disabled actions so it is clear the device was seen and
     # why nothing is offered for it.
     no_learn_reason: str | None = None
+    # Informational only, see RF_BANDS. None for devices with no radio.
+    rf_bands: str | None = None
 
 
 class Device(BaseModel):
@@ -112,4 +121,5 @@ def capabilities_for(device_class: str) -> Capabilities:
         send_rf=learn_rf,
         read_state=device_class in STATE_READABLE_CLASSES,
         no_learn_reason=reason,
+        rf_bands=RF_BANDS if learn_rf else None,
     )
