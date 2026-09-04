@@ -60,6 +60,21 @@ def send_command(entity_id: str, device: str, command: str) -> tuple[bool, str |
     )
 
 
+def send_command_auto(device: str, command: str) -> tuple[bool, str | None]:
+    """Send a code, picking the remote entity itself.
+
+    Used by the MQTT command handler, which has no entity to work with: the
+    press comes from Home Assistant and only names the stored device/command.
+    """
+    remotes = list_remote_entities()
+    if not remotes:
+        return False, (
+            "No hay ninguna entidad remote.* en Home Assistant. Configurá la integración "
+            "Broadlink para que las entidades creadas puedan enviar códigos."
+        )
+    return send_command(remotes[0], device, command)
+
+
 def list_remote_entities() -> list[str]:
     """Return the remote.* entity ids Home Assistant currently knows about.
 

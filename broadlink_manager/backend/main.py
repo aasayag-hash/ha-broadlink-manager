@@ -11,7 +11,16 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import device_state, discovery, ha_api, learning, storage
+from . import (
+    device_state,
+    discovery,
+    entities,
+    entities_store,
+    ha_api,
+    learning,
+    settings_store,
+    storage,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("broadlink_manager.main")
@@ -65,6 +74,25 @@ class LearnIn(BaseModel):
 class SaveLearnedIn(BaseModel):
     subdevice: str
     command: str
+
+
+class MqttSettingsIn(BaseModel):
+    # Empty host means "go back to detecting it from Home Assistant".
+    host: str = ""
+    port: int = 1883
+    username: str | None = None
+    password: str | None = None
+    ssl: bool = False
+
+
+class CreateEntityIn(BaseModel):
+    kind: str  # "button" or "switch"
+    name: str
+    subdevice: str
+    # A button fires one command; a switch needs the ON/OFF pair.
+    command: str | None = None
+    command_on: str | None = None
+    command_off: str | None = None
 
 
 @app.get("/api/devices")
@@ -297,6 +325,195 @@ def save_learned(mac: str, payload: SaveLearnedIn) -> dict[str, Any]:
     return {"ok": True, "frequency": frequency}
 
 
+@app.get("/api/mqtt")
+def get_mqtt_settings() -> dict[str, Any]:
+    """Current broker settings and where they came from.
+
+    The password is never returned: it would be readable by anyone who can open
+    the panel, and the form treats an empty field as "keep the stored one".
+    """
+    manual = settings_store.get_mqtt()
+    detected, detect_error = entities.supervisor_broker()
+
+    if manual:
+        shown = {k: v for k, v in manual.items() if k != "password"}
+        shown["has_password"] = bool(manual.get("password"))
+    elif detected:
+        shown = {k: v for k, v in detected.items() if k != "password"}
+        shown["has_password"] = bool(detected.get("password"))
+    else:
+        shown = {"host": "", "port": 1883, "username": "", "ssl": False, "has_password": False}
+
+    return {
+        "source": "manual" if manual else ("auto" if detected else "none"),
+        "settings": shown,
+        "detected": (
+            {k: v for k, v in detected.items() if k != "password"} if detected else None
+        ),
+        "detect_error": detect_error,
+        "status": entities.publisher.status,
+        "error": entities.publisher.last_error,
+    }
+
+
+@app.post("/api/mqtt")
+def set_mqtt_settings(payload: MqttSettingsIn) -> dict[str, Any]:
+    host = payload.host.strip()
+
+    if not host:
+        settings_store.set_mqtt(None)
+    else:
+        config: dict[str, Any] = {
+            "host": host,
+            "port": payload.port,
+            "ssl": payload.ssl,
+        }
+        if payload.username:
+            config["username"] = payload.username
+        # An empty password field keeps whatever was stored, so editing the host
+        # does not silently wipe the credentials.
+        if payload.password:
+            config["password"] = payload.password
+        else:
+            previous = settings_store.get_mqtt() or {}
+            if previous.get("password") and previous.get("username") == payload.username:
+                config["password"] = previous["password"]
+        settings_store.set_mqtt(config)
+
+    # Reconnect with the new settings and report the outcome straight away,
+    # rather than letting the user discover it when an entity fails to appear.
+    entities.publisher.stop()
+    ok, error = entities.publisher.start(_handle_mqtt_command)
+    if not ok:
+        raise HTTPException(status_code=400, detail=error or "No se pudo conectar al broker")
+    return {"ok": True, "status": entities.publisher.status}
+
+
+@app.get("/api/entities/{mac}")
+def list_entities(mac: str) -> dict[str, Any]:
+    return {
+        "mqtt": {"status": entities.publisher.status, "error": entities.publisher.last_error},
+        "entities": entities_store.list_entities(mac),
+    }
+
+
+@app.post("/api/entities/{mac}")
+def create_entity(mac: str, payload: CreateEntityIn) -> dict[str, Any]:
+    device = next((d for d in discovery.list_known() if d.mac == mac), None)
+    if device is None:
+        raise HTTPException(status_code=404, detail="Dispositivo no encontrado")
+
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="El nombre no puede estar vacío")
+
+    kind = payload.kind.lower()
+    if kind == "button":
+        if not payload.command:
+            raise HTTPException(status_code=400, detail="Falta el comando a disparar")
+        commands = {"press": payload.command}
+    elif kind == "switch":
+        if not payload.command_on or not payload.command_off:
+            raise HTTPException(
+                status_code=400, detail="Un interruptor necesita un comando para encender y otro para apagar"
+            )
+        commands = {"on": payload.command_on, "off": payload.command_off}
+    else:
+        raise HTTPException(status_code=400, detail="El tipo debe ser 'button' o 'switch'")
+
+    # Verify the codes exist before creating an entity that would fail on its
+    # first press: a broken entity in HA is harder to notice than an error here.
+    try:
+        stored = storage.read_codes(mac)
+    except storage.StorageError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    group = stored.get(payload.subdevice, {})
+    missing = [c for c in commands.values() if c not in group]
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No existe el comando '{missing[0]}' en '{payload.subdevice}'",
+        )
+
+    slug = entities.slugify(name)
+    entity = {
+        "mac": mac,
+        "slug": slug,
+        "kind": kind,
+        "name": name,
+        "subdevice": payload.subdevice,
+        "commands": commands,
+    }
+
+    try:
+        if kind == "button":
+            entities.publish_button(mac, device.model, name, slug)
+        else:
+            entities.publish_switch(mac, device.model, name, slug)
+            entities.publish_state(mac, slug, "OFF")
+    except entities.MqttError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    entities_store.add(entity)
+    return entity
+
+
+@app.delete("/api/entities/{mac}/{slug}")
+def delete_entity(mac: str, slug: str) -> dict[str, bool]:
+    entity = entities_store.remove(mac, slug)
+    if entity is None:
+        raise HTTPException(status_code=404, detail="Entidad no encontrada")
+    try:
+        entities.remove_entity(entity["kind"], mac, slug)
+    except entities.MqttError as exc:
+        # The mapping is already gone, so the entity cannot fire any more; say
+        # plainly that Home Assistant may still show it until MQTT is back.
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"Se borró el mapeo pero no se pudo avisar al broker ({exc}). La entidad puede "
+                "seguir apareciendo en Home Assistant hasta que MQTT vuelva."
+            ),
+        ) from exc
+    return {"ok": True}
+
+
+def _handle_mqtt_command(mac_slug: str, entity_slug: str, payload: str) -> None:
+    """Fire the code behind an entity when Home Assistant publishes to it.
+
+    Runs on paho's network thread, so every failure is logged rather than
+    raised: an exception here would take the MQTT loop down with it.
+    """
+    entity = entities_store.find(mac_slug, entity_slug)
+    if entity is None:
+        logger.warning("Comando para una entidad desconocida: %s/%s", mac_slug, entity_slug)
+        return
+
+    if entity["kind"] == "button":
+        command = entity["commands"]["press"]
+    else:
+        wanted = payload.strip().upper()
+        command = entity["commands"].get("on" if wanted == "ON" else "off")
+
+    if not command:
+        logger.warning("Sin comando para %s con payload %r", entity_slug, payload)
+        return
+
+    ok, error = ha_api.send_command_auto(entity["subdevice"], command)
+    if not ok:
+        logger.warning("No se pudo enviar %s/%s: %s", entity["subdevice"], command, error)
+        return
+
+    if entity["kind"] == "switch":
+        # Optimistic: a one-way remote gives no feedback, so the reported state
+        # is simply what was last asked for.
+        try:
+            entities.publish_state(entity["mac"], entity_slug, payload.strip().upper())
+        except entities.MqttError as exc:
+            logger.warning("No se pudo publicar el estado de %s: %s", entity_slug, exc)
+
+
 def _refresh_state() -> None:
     """Poll readable devices one at a time, isolating failures per device.
 
@@ -341,6 +558,12 @@ def _worker(name: str, interval: int, task) -> None:
 def startup() -> None:
     discovery.load_persisted()
 
+    # MQTT is optional: without a broker the add-on still discovers devices,
+    # learns codes and manages the table -- only entity creation is unavailable.
+    ok, error = entities.publisher.start(_handle_mqtt_command)
+    if not ok:
+        logger.warning("MQTT no disponible: %s", error)
+
     # First scan runs in the background: it takes seconds per interface, and
     # blocking startup would leave the ingress panel spinning on a blank page.
     threading.Thread(target=discovery.scan, name="initial-scan", daemon=True).start()
@@ -355,6 +578,7 @@ def startup() -> None:
 @app.on_event("shutdown")
 def shutdown() -> None:
     _shutdown.set()
+    entities.publisher.stop()
 
 
 @app.get("/")

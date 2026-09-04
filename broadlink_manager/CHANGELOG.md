@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.4.0
+
+**Nuevo**
+
+- Crear **entidades en Home Assistant** desde los códigos aprendidos: botones (un código)
+  e interruptores (un par encender/apagar). Aparecen solas, sin reiniciar ni tocar YAML, y
+  quedan agrupadas bajo el dispositivo Broadlink al que pertenecen.
+- Las entidades sobreviven a los reinicios de Home Assistant y del add-on.
+- Borrarlas desde la app las saca también de Home Assistant.
+- **Configuración del broker MQTT**: se detecta solo el que usa Home Assistant, y se puede
+  cambiar servidor, puerto, usuario, contraseña y SSL si tu broker está en otra máquina o
+  en un puerto distinto. Dejando el servidor vacío se vuelve a la detección automática.
+  Al guardar se reconecta y te dice en el momento si funcionó.
+- Sin broker MQTT el add-on sigue sirviendo para buscar dispositivos, aprender códigos y
+  administrar la planilla: lo único que no vas a poder hacer es crear entidades.
+
+**Detalle**
+
+- Los interruptores se crean en modo optimista, porque un control remoto no informa su
+  estado: Home Assistant muestra lo último que se le pidió.
+
 ## 0.3.0
 
 **Nuevo**

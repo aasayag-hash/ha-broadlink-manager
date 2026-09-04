@@ -13,6 +13,7 @@
         <button class="tab-btn active" data-tab="dispositivos">Dispositivos</button>
         <button class="tab-btn" data-tab="aprender">Aprender</button>
         <button class="tab-btn" data-tab="codigos">C&oacute;digos</button>
+        <button class="tab-btn" data-tab="entidades">Entidades</button>
       </nav>
     </header>
 
@@ -118,6 +119,92 @@
             <span id="codes-count" class="codes-count"></span>
           </div>
           <div id="codes-groups"></div>
+        </div>
+      </section>
+
+      <section id="tab-entidades" class="tab-panel">
+        <div class="entities-layout">
+          <div class="entity-form-panel">
+            <h2>Crear entidad</h2>
+            <p id="mqtt-status" class="field-hint"></p>
+            <form id="entity-form">
+              <label>
+                Tipo
+                <select id="entity-kind">
+                  <option value="button">Bot&oacute;n (un c&oacute;digo)</option>
+                  <option value="switch">Interruptor (encender / apagar)</option>
+                </select>
+              </label>
+              <label>
+                Nombre
+                <input type="text" id="entity-name" required placeholder="Luz del patio" />
+              </label>
+              <label>
+                Equipo
+                <select id="entity-group"></select>
+              </label>
+              <label id="entity-cmd-label">
+                C&oacute;digo
+                <select id="entity-command"></select>
+              </label>
+              <label id="entity-on-label" class="hidden">
+                C&oacute;digo para encender
+                <select id="entity-command-on"></select>
+              </label>
+              <label id="entity-off-label" class="hidden">
+                C&oacute;digo para apagar
+                <select id="entity-command-off"></select>
+              </label>
+              <p id="entity-error" class="error hidden"></p>
+              <div class="actions">
+                <button type="submit">Crear en Home Assistant</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="entity-list-panel">
+            <details id="mqtt-settings">
+              <summary>Configuraci&oacute;n del broker MQTT</summary>
+              <p id="mqtt-source" class="field-hint"></p>
+              <form id="mqtt-form">
+                <label>
+                  Servidor
+                  <input type="text" id="mqtt-host" placeholder="(autom&aacute;tico)" />
+                  <small class="field-hint">
+                    Vac&iacute;o = usar el broker que informa Home Assistant.
+                  </small>
+                </label>
+                <label>
+                  Puerto
+                  <input type="number" id="mqtt-port" value="1883" min="1" max="65535" />
+                </label>
+                <label>
+                  Usuario
+                  <input type="text" id="mqtt-user" autocomplete="off" />
+                </label>
+                <label>
+                  Contrase&ntilde;a
+                  <input type="password" id="mqtt-pass" autocomplete="new-password" />
+                  <small class="field-hint" id="mqtt-pass-hint"></small>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="mqtt-ssl" />
+                  Usar SSL/TLS
+                </label>
+                <p id="mqtt-error" class="error hidden"></p>
+                <div class="actions">
+                  <button type="submit" id="mqtt-save">Guardar y conectar</button>
+                </div>
+              </form>
+            </details>
+
+            <h2>Entidades creadas</h2>
+            <p class="field-hint">
+              Aparecen solas en Home Assistant, agrupadas bajo el dispositivo Broadlink.
+              No hace falta reiniciar ni editar YAML.
+            </p>
+            <ul id="entity-list"></ul>
+          </div>
         </div>
       </section>
 

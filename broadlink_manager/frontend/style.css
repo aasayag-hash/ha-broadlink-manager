@@ -527,6 +527,104 @@ table {
   cursor: help;
 }
 
+/* Entities ---------------------------------------------------------------- */
+
+.entities-layout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.entity-form-panel {
+  background: var(--surface);
+  border-radius: 6px;
+  padding: 16px;
+  flex: 0 0 340px;
+}
+
+.entity-list-panel {
+  background: var(--surface);
+  border-radius: 6px;
+  padding: 16px;
+  flex: 1;
+  min-width: 320px;
+}
+
+.entity-form-panel h2,
+.entity-list-panel h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+
+#entity-list {
+  list-style: none;
+  margin: 12px 0 0 0;
+  padding: 0;
+}
+
+.entity-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  background: #fafbfc;
+  margin-bottom: 6px;
+}
+
+.entity-name {
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+}
+
+.entity-detail {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.entity-row button {
+  padding: 3px 9px;
+  font-size: 0.75rem;
+  flex: none;
+}
+
+#mqtt-settings {
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fafbfc;
+}
+
+#mqtt-settings summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+#mqtt-settings form {
+  margin-top: 12px;
+}
+
+#mqtt-error,
+#entity-error {
+  background: var(--danger-bg);
+  border: 1px solid #f5c6c2;
+  border-radius: 4px;
+  padding: 8px 10px;
+  margin: 0 0 10px 0;
+  font-size: 0.85rem;
+}
+
+#mqtt-error.hidden,
+#entity-error.hidden {
+  display: none;
+}
+
 /* Modal ------------------------------------------------------------------- */
 
 .modal {

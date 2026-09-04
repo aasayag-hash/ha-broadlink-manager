@@ -30,6 +30,12 @@ function initTabs() {
       $(`#tab-${btn.dataset.tab}`).classList.add("active");
       if (btn.dataset.tab === "aprender") renderLearn();
       if (btn.dataset.tab === "codigos") loadCodes();
+      if (btn.dataset.tab === "entidades") {
+        // Entities are built from stored codes, so the table has to be loaded
+        // before the form can offer anything to pick.
+        loadCodes().then(loadEntities);
+        loadMqttSettings();
+      }
     });
   });
 }
@@ -725,11 +731,220 @@ async function extractDetail(res) {
   return detail;
 }
 
+// --- entities ---------------------------------------------------------------
+
+let mqttStatus = { status: "unknown", error: null };
+
+async function loadEntities() {
+  const list = $("#entity-list");
+  if (!selectedMac) {
+    list.innerHTML = '<li class="list-empty">Elegí un dispositivo primero.</li>';
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}api/entities/${encodeURIComponent(selectedMac)}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    mqttStatus = data.mqtt;
+    renderMqttStatus();
+    renderEntityList(data.entities);
+    fillEntityForm();
+  } catch (err) {
+    void err;
+  }
+}
+
+function renderMqttStatus() {
+  const el = $("#mqtt-status");
+  const ok = mqttStatus.status === "connected";
+  el.classList.toggle("error", !ok);
+  el.textContent = ok
+    ? "MQTT conectado. Las entidades aparecen al instante en Home Assistant."
+    : mqttStatus.error ||
+      "Sin conexión MQTT. Instalá el add-on Mosquitto para poder crear entidades.";
+  // Nothing can be created without a broker, so make that obvious rather than
+  // letting the user fill the form and hit an error on submit.
+  $("#entity-form").querySelector("button[type=submit]").disabled = !ok;
+}
+
+function renderEntityList(list) {
+  const el = $("#entity-list");
+  if (!list.length) {
+    el.innerHTML =
+      '<li class="list-empty">Todavía no creaste ninguna entidad para este dispositivo.</li>';
+    return;
+  }
+  el.innerHTML = list
+    .map((e) => {
+      const detail =
+        e.kind === "button"
+          ? `${e.subdevice} / ${e.commands.press}`
+          : `${e.subdevice} / ${e.commands.on} · ${e.commands.off}`;
+      return `
+      <li class="entity-row">
+        <span class="entity-name">${escapeHtml(e.name)}</span>
+        <span class="kind-tag">${e.kind === "button" ? "botón" : "interruptor"}</span>
+        <span class="entity-detail">${escapeHtml(detail)}</span>
+        <button class="danger del-entity-btn" data-slug="${escapeHtml(e.slug)}">Borrar</button>
+      </li>`;
+    })
+    .join("");
+}
+
+function fillEntityForm() {
+  const groupSelect = $("#entity-group");
+  const previous = groupSelect.value;
+  groupSelect.innerHTML = codeGroups
+    .map((g) => `<option value="${escapeHtml(g.subdevice)}">${escapeHtml(g.subdevice)}</option>`)
+    .join("");
+  if (previous) groupSelect.value = previous;
+  fillCommandSelects();
+}
+
+function fillCommandSelects() {
+  const group = codeGroups.find((g) => g.subdevice === $("#entity-group").value);
+  const options = (group ? group.commands : [])
+    .map((c) => `<option value="${escapeHtml(c.command)}">${escapeHtml(c.command)}</option>`)
+    .join("");
+  ["#entity-command", "#entity-command-on", "#entity-command-off"].forEach((sel) => {
+    $(sel).innerHTML = options;
+  });
+}
+
+function updateEntityKindFields() {
+  const isSwitch = $("#entity-kind").value === "switch";
+  $("#entity-cmd-label").classList.toggle("hidden", isSwitch);
+  $("#entity-on-label").classList.toggle("hidden", !isSwitch);
+  $("#entity-off-label").classList.toggle("hidden", !isSwitch);
+}
+
+async function submitEntity(event) {
+  event.preventDefault();
+  const errorEl = $("#entity-error");
+  errorEl.classList.add("hidden");
+
+  const kind = $("#entity-kind").value;
+  const body = {
+    kind,
+    name: $("#entity-name").value,
+    subdevice: $("#entity-group").value,
+  };
+  if (kind === "button") {
+    body.command = $("#entity-command").value;
+  } else {
+    body.command_on = $("#entity-command-on").value;
+    body.command_off = $("#entity-command-off").value;
+  }
+
+  const res = await fetch(`${API_BASE}api/entities/${encodeURIComponent(selectedMac)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    errorEl.textContent = await extractDetail(res);
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
+  $("#entity-name").value = "";
+  loadEntities();
+}
+
+async function loadMqttSettings() {
+  try {
+    const res = await fetch(`${API_BASE}api/mqtt`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const s = data.settings;
+
+    $("#mqtt-host").value = data.source === "manual" ? s.host || "" : "";
+    $("#mqtt-host").placeholder =
+      data.source === "auto" ? `${s.host} (detectado)` : "(automático)";
+    $("#mqtt-port").value = s.port || 1883;
+    $("#mqtt-user").value = s.username || "";
+    $("#mqtt-ssl").checked = !!s.ssl;
+    $("#mqtt-pass").value = "";
+    $("#mqtt-pass-hint").textContent = s.has_password
+      ? "Ya hay una contraseña guardada. Dejalo vacío para conservarla."
+      : "";
+
+    $("#mqtt-source").textContent =
+      data.source === "manual"
+        ? `Usando la configuración cargada a mano (${s.host}:${s.port}). Borrá el servidor para volver a la automática.`
+        : data.source === "auto"
+        ? `Detectado automáticamente desde Home Assistant: ${s.host}:${s.port}.`
+        : data.detect_error || "No se detectó ningún broker.";
+  } catch (err) {
+    void err;
+  }
+}
+
+async function submitMqttSettings(event) {
+  event.preventDefault();
+  const errorEl = $("#mqtt-error");
+  const button = $("#mqtt-save");
+  errorEl.classList.add("hidden");
+  button.disabled = true;
+  button.textContent = "Conectando…";
+
+  try {
+    const res = await fetch(`${API_BASE}api/mqtt`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        host: $("#mqtt-host").value,
+        port: Number($("#mqtt-port").value) || 1883,
+        username: $("#mqtt-user").value || null,
+        password: $("#mqtt-pass").value || null,
+        ssl: $("#mqtt-ssl").checked,
+      }),
+    });
+    if (!res.ok) {
+      // Keep the form open on failure so the typed settings are not lost.
+      errorEl.textContent = await extractDetail(res);
+      errorEl.classList.remove("hidden");
+      return;
+    }
+    await loadMqttSettings();
+    loadEntities();
+  } finally {
+    button.disabled = false;
+    button.textContent = "Guardar y conectar";
+  }
+}
+
+function initEntities() {
+  $("#mqtt-form").addEventListener("submit", submitMqttSettings);
+  $("#entity-kind").addEventListener("change", updateEntityKindFields);
+  $("#entity-group").addEventListener("change", fillCommandSelects);
+  $("#entity-form").addEventListener("submit", submitEntity);
+
+  $("#entity-list").addEventListener("click", async (event) => {
+    const button = event.target.closest(".del-entity-btn");
+    if (!button) return;
+    if (!window.confirm("¿Borrar esta entidad de Home Assistant?")) return;
+    const res = await fetch(
+      `${API_BASE}api/entities/${encodeURIComponent(selectedMac)}/${encodeURIComponent(
+        button.dataset.slug
+      )}`,
+      { method: "DELETE" }
+    );
+    if (!res.ok) window.alert(await extractDetail(res));
+    loadEntities();
+  });
+
+  updateEntityKindFields();
+}
+
 function init() {
   initTabs();
   initDeviceList();
   initCodes();
   initLearn();
+  initEntities();
   $("#btn-scan").addEventListener("click", runScan);
   $("#add-device-form").addEventListener("submit", submitAddDevice);
 

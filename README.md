@@ -22,8 +22,10 @@ Desarrollo.
 
 - Home Assistant OS o Supervised (los add-ons no existen en HA Container ni Core).
 - Un Broadlink **RM pro** o **RM4 pro** para RF. Para IR sirve cualquier RM, incluido el mini.
-- El add-on **Mosquitto** (broker MQTT) si querés generar entidades. El aprendizaje de
-  códigos funciona igual sin él.
+- Un broker MQTT si querés generar entidades. Si usás el add-on **Mosquitto**, el add-on
+  lo detecta solo; si tu broker está en otra máquina o en otro puerto, se pueden cargar los
+  datos a mano desde la pestaña Entidades. El aprendizaje de códigos funciona igual sin
+  broker.
 
 ## Instalación
 
@@ -47,7 +49,8 @@ Desarrollo.
    responde.
 3. **Códigos** — la planilla con todo lo aprendido, agrupado por equipo. Desde acá se
    prueba, se renombra, se mueve de equipo y se borra.
-4. **Asignar** — convertí un código en un botón, o un par de códigos en un interruptor.
+4. **Entidades** — convertí un código en un botón, o un par de códigos en un interruptor.
+   Aparecen en Home Assistant al instante, agrupados bajo el dispositivo Broadlink.
 
 ## Aviso sobre los datos
 

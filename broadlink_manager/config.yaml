@@ -1,5 +1,5 @@
 name: "Broadlink Manager"
-version: "0.3.0"
+version: "0.4.0"
 slug: "broadlink_manager"
 description: "Learn, store and test Broadlink RF/IR codes, then turn them into Home Assistant entities"
 url: "https://github.com/aasayag-hash/ha-broadlink-manager"
@@ -14,6 +14,11 @@ panel_icon: mdi:remote
 panel_title: "Broadlink"
 hassio_api: true
 homeassistant_api: true
+# mqtt:need gets the broker's host and credentials from the Supervisor, so the
+# user never types them. Entities are created through MQTT discovery because an
+# add-on cannot register native entities the way an integration can.
+services:
+  - mqtt:need
 # host_network: Broadlink discovery is a UDP broadcast. Inside the add-on's bridge
 # network the broadcast never reaches the LAN, so no device is ever found.
 host_network: true
