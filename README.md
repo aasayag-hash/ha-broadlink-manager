@@ -65,6 +65,39 @@ Este add-on hace los cinco pasos desde una pantalla.
 4. Buscá **Broadlink Manager** en la tienda, instalalo e iniciálo.
 5. Abrilo desde la barra lateral.
 
+## La idea general
+
+Cinco solapas, en el orden en que se usan: primero encontrás el hardware, después le
+enseñás los códigos, y a partir de ahí los usás.
+
+```
+   ───────── se configura una vez ─────────    ──── se usa siempre ────
+
+   ① DISPOSITIVOS   →    ② APRENDER     ─┬─→   ③ CONTROL     probar a mano
+   ¿qué hardware         capturar los    │
+   hay en la red?        códigos del     ├─→   ④ CÓDIGOS     ordenar, corregir
+                         control         │
+                                         └─→   ⑤ ENTIDADES   automatizar en HA
+```
+
+El único orden obligatorio es el principio: sin un dispositivo elegido no se puede
+aprender, y sin códigos guardados las otras tres solapas no tienen nada que mostrar. Después
+de eso vas y venís libremente.
+
+### Qué hace cada solapa
+
+| Solapa | Para qué es | Qué necesita antes | Qué deja hecho | Dónde queda |
+|---|---|---|---|---|
+| **① Dispositivos** | Encontrar los Broadlink de la red y ver qué puede cada uno | Nada | Un dispositivo elegido | `/data/devices.json` |
+| **② Aprender** | Capturar los códigos de un control, de a uno o con plantilla | Un dispositivo que aprenda (familia RM) | Códigos guardados con nombre y equipo | `.storage` de HA |
+| **③ Control** | Disparar los códigos de un toque, desde el celular | Códigos guardados | Nada: solo envía | — |
+| **④ Códigos** | Ordenar: renombrar, mover, borrar, exportar, importar | Códigos guardados | Los mismos códigos, ordenados | `.storage` de HA |
+| **⑤ Entidades** | Que HA los use en automatizaciones y tableros | Códigos guardados + broker MQTT | Botones e interruptores en HA | MQTT + `/data/entities.json` |
+
+**Regla que atraviesa todo:** los códigos viven en un solo lugar —
+`.storage/broadlink_remote_<MAC>_codes`, el archivo de Home Assistant. No hay copia propia.
+Lo que aprendés acá lo ve HA, y lo que ya tenías aprendido por otros medios aparece acá.
+
 ## Cómo se usa
 
 ### 1. Dispositivos
@@ -86,7 +119,26 @@ A1 sensor    192.168.1.60    ● online   ·  Temperatura: 24.3 °C · Humedad: 
   ✗ Es un sensor ambiental: no emite ni recibe códigos. Se muestran sus lecturas.
 ```
 
-Si tu Broadlink está en otra VLAN o en una red donde no llega el broadcast, agregalo por IP.
+La lógica de esta solapa:
+
+```
+Abrís la solapa
+   │
+   ├─ Aparece tu Broadlink?
+   │     SÍ → tocalo para elegirlo. Listo, seguí en Aprender.
+   │     NO ↓
+   │
+   ├─ Tocá "Buscar" (rebarre todas las interfaces)
+   │     Aparece? → elegilo
+   │     NO ↓
+   │
+   ├─ Está en otra VLAN, red de invitados o WiFi aislada?
+   │     → agregalo por IP con el formulario de la izquierda
+   │
+   └─ Aparece pero dice "no reconoce este modelo"?
+         → botón Modelo → elegí el modelo equivalente
+           (pasa con clones y revisiones nuevas de hardware)
+```
 
 **Qué reconoce.** El descubrimiento automático encuentra por igual todas las familias, no
 solo los RM: las 27 familias y 137 modelos que soporta
@@ -106,6 +158,36 @@ equivalente, y el add-on lo trata como ese. La elección se guarda y sobrevive a
 reescaneos.
 
 ### 2. Aprender
+
+La lógica de esta solapa:
+
+```
+Tenés que aprender...
+   │
+   ├─ ¿un control entero (TV, aire, portón)?
+   │     → elegí la plantilla, ponele nombre al equipo,
+   │       y te va pidiendo los botones uno por uno
+   │
+   └─ ¿un botón suelto?
+         → Aprender IR   o   Aprender RF
+                │                  │
+                │                  ├─ FASE 1: mantené apretado
+                │                  │   → detecta la frecuencia
+                │                  │
+                │                  └─ FASE 2: soltá y apretá una vez
+                │                      → captura el código
+                │                        (si falla, reintentás sin
+                │                         repetir el barrido)
+                │
+                └─ apuntá y apretá → captura el código
+                            │
+                            ▼
+                    ┌─────────────────────┐
+                    │  Probar el código   │ ← el aparato reacciona?
+                    └─────────────────────┘
+                       SÍ ↓         NO → Descartar y reintentar
+                    Nombrar y guardar
+```
 
 Elegí el dispositivo y el modo. **IR** es un solo paso: apuntás el control y apretás.
 **RF** son dos fases: primero mantenés el botón apretado para que encuentre la frecuencia,
@@ -189,6 +271,25 @@ automático, o para llevar el mando a otra instalación) e **importar** un archi
 importar te muestra qué códigos son nuevos y cuáles ya existen, y para los repetidos elegís
 si dejar los tuyos, guardar los dos o reemplazarlos.
 
+La lógica de esta solapa:
+
+```
+¿Qué querés hacer?
+   │
+   ├─ Ver si un código funciona          → Probar
+   ├─ Le puse un nombre confuso          → Editar
+   ├─ Lo guardé en el equipo equivocado  → Editar → cambiar el equipo
+   ├─ Ya no lo uso                       → Borrar
+   ├─ Todo un equipo quedó mal nombrado  → Renombrar (en la fila del grupo)
+   │      ⚠ tus automatizaciones siguen usando el nombre viejo
+   │
+   ├─ Guardar un respaldo / llevarlo a otro HA   → Exportar
+   └─ Traer códigos de otra instalación          → Importar
+            │
+            └─ ¿hay nombres repetidos?
+                  → elegís: dejar los tuyos / guardar los dos / reemplazar
+```
+
 ### 5. Entidades
 
 Convertí un código en un **botón**, o un par de códigos en un **interruptor**. Aparecen al
@@ -196,6 +297,77 @@ instante en Home Assistant, agrupados bajo el dispositivo Broadlink, sin reinici
 
 Si tu broker no es el que informa Home Assistant, podés cargar servidor, puerto, usuario,
 contraseña y SSL a mano. Dejando el servidor vacío vuelve a la detección automática.
+
+La lógica de esta solapa:
+
+```
+¿Dice "MQTT conectado"?
+   │
+   NO → abrí "Configuración del broker MQTT"
+   │      ├─ ¿tenés el add-on Mosquitto? → se detecta solo, revisá el error
+   │      └─ ¿tu broker está en otra máquina o puerto?
+   │            → cargá servidor, puerto, usuario y contraseña
+   │              (al guardar reconecta y te dice si funcionó)
+   SÍ ↓
+   │
+   └─ ¿qué querés crear?
+         │
+         ├─ Un código, una acción (abrir el portón, apagar la TV)
+         │     → Botón
+         │
+         └─ Dos códigos, encender y apagar (una luz, un ventilador)
+               → Interruptor
+                  ⓘ va en modo optimista: un control no informa su estado,
+                    así que HA muestra lo último que se le pidió
+```
+
+## Qué pasa por dentro
+
+Dos recorridos, que explican por qué las cosas están donde están.
+
+**Aprender un código:**
+
+```
+  El control remoto
+        │ señal IR o RF
+        ▼
+  El Broadlink  ── el add-on le pide "entrá en modo aprendizaje" y le
+        │           pregunta cada medio segundo si ya llegó algo
+        ▼
+  backend/learning.py  ── máquina de estados; en RF son dos fases
+        │
+        ▼
+  backend/storage.py   ── respaldo → escritura atómica → merge
+        │
+        ▼
+  /config/.storage/broadlink_remote_<MAC>_codes
+        │
+        └──→ lo lee también Home Assistant, sin configuración extra
+```
+
+**Enviar un código** (desde el control virtual, la planilla o una entidad):
+
+```
+  Vos, o una automatización de HA
+        │
+        ▼
+  El add-on  ── nunca le habla directo al Broadlink
+        │
+        ▼
+  remote.send_command de Home Assistant
+        │
+        ▼
+  El Broadlink → el aparato
+```
+
+Ese desvío por Home Assistant es a propósito: **HA es el único que mantiene la sesión con
+el Broadlink**. Dos procesos turnándose el mismo socket es una causa conocida de
+desconexiones, así que el add-on aprende (cuando HA no está usando el equipo) pero delega
+el envío.
+
+La única excepción es el botón **Probar** del código recién capturado, que va directo al
+hardware — todavía no está guardado, así que `remote.send_command` no tendría qué
+referenciar.
 
 ## Cómo guarda los datos
 
