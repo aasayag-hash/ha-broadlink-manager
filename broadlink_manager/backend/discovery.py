@@ -30,6 +30,17 @@ _devices: dict[str, Device] = {}
 _devices_lock = threading.Lock()
 
 
+def _mac_bytes(mac: str) -> bytes:
+    """Turn aa:bb:cc:dd:ee:ff back into the byte order the library expects.
+
+    gendevice() takes the same reversed bytes discovery hands out, and rejects a
+    colon-separated string outright ("non-hexadecimal number found in
+    fromhex()").
+    """
+    cleaned = mac.replace(":", "").replace("-", "").replace(".", "")
+    return bytes(reversed(bytes.fromhex(cleaned)))
+
+
 def _mac_str(mac: bytes | str) -> str:
     """Normalize a MAC to aa:bb:cc:dd:ee:ff.
 
@@ -89,6 +100,27 @@ def _hello_with_retries(ip: str, attempts: int = 2) -> Any | None:
     return None
 
 
+def _apply_forced_model(raw: Any, mac: str) -> Any:
+    """Rebuild a freshly discovered device as the model the user chose.
+
+    Without this, every scan would re-detect the real devtype and undo the
+    override -- which for an unrecognised device means losing the ability to use
+    it at all until the user sets it again.
+    """
+    with _devices_lock:
+        existing = _devices.get(mac)
+    forced = existing.forced_devtype if existing else None
+    if forced is None:
+        return raw
+
+    try:
+        host, port = raw.host if isinstance(raw.host, tuple) else (raw.host, 80)
+        return broadlink.gendevice(forced, (host, port), _mac_bytes(mac))
+    except Exception as exc:  # noqa: BLE001 - fall back to what was discovered
+        logger.warning("No se pudo reaplicar el modelo forzado en %s: %s", mac, exc)
+        return raw
+
+
 def _to_device(raw: Any, *, manual: bool = False) -> Device:
     device_class = type(raw).__name__
     host, port = raw.host if isinstance(raw.host, tuple) else (raw.host, 80)
@@ -118,6 +150,8 @@ def _remember(device: Device, raw: Any) -> None:
             # guarantees it stays listed if the broadcast stops working.
             device.manual = device.manual or previous.manual
             device.state = previous.state
+            if device.forced_devtype is None:
+                device.forced_devtype = previous.forced_devtype
         _devices[device.mac] = device
 
 
@@ -149,6 +183,7 @@ def scan() -> list[Device]:
             found[_mac_str(raw.mac)] = raw
 
     for mac, raw in found.items():
+        raw = _apply_forced_model(raw, mac)
         device = _to_device(raw)
         _authenticate(device, raw)
         _remember(device, raw)
@@ -171,6 +206,85 @@ def scan() -> list[Device]:
 
     _persist()
     return list_known()
+
+
+def known_models() -> list[dict[str, Any]]:
+    """Every model the library recognises, for the manual override picker.
+
+    Offered because discovery reports a numeric devtype and the library maps it
+    to a class: a device whose devtype is not in that table comes back as a
+    generic Device with nothing usable. Clones and newer revisions land there,
+    and picking the equivalent model by hand makes them work.
+    """
+    models = []
+    for cls, products in broadlink.SUPPORTED_TYPES.items():
+        for devtype, (model, manufacturer) in products.items():
+            caps = capabilities_for(cls.__name__)
+            models.append(
+                {
+                    "devtype": devtype,
+                    "model": model,
+                    "manufacturer": manufacturer,
+                    "device_class": cls.__name__,
+                    "learn_ir": caps.learn_ir,
+                    "learn_rf": caps.learn_rf,
+                }
+            )
+    models.sort(key=lambda m: (m["manufacturer"], m["model"]))
+    return models
+
+
+def is_generic(device: Device) -> bool:
+    """True when the library could not identify the device.
+
+    gendevice() falls back to the base Device class for an unknown devtype, and
+    that class can neither learn nor send anything.
+    """
+    return device.device_class == "Device"
+
+
+def set_model(mac: str, devtype: int) -> tuple[Device | None, str | None]:
+    """Force a device to be treated as a given model. Returns (device, error).
+
+    For hardware the library does not recognise, or recognises as something less
+    capable than it is. The override is persisted, so it survives restarts and
+    rescans.
+    """
+    with _devices_lock:
+        existing = _devices.get(mac)
+    if existing is None:
+        return None, "Dispositivo no encontrado"
+
+    if not any(devtype in products for products in broadlink.SUPPORTED_TYPES.values()):
+        return None, f"El código de modelo {devtype} (0x{devtype:04x}) no lo conoce la librería."
+
+    try:
+        raw = broadlink.gendevice(devtype, (existing.host, existing.port), _mac_bytes(mac))
+    except Exception as exc:  # noqa: BLE001 - library raises its own tree
+        return None, f"No se pudo crear el dispositivo con ese modelo: {exc}"
+
+    device = _to_device(raw, manual=existing.manual)
+    # Keep the forced type: a later scan would otherwise re-detect the original
+    # devtype and quietly undo the user's choice.
+    device.forced_devtype = devtype
+    _authenticate(device, raw)
+    _remember(device, raw)
+    _persist()
+
+    if device.last_error:
+        return device, device.last_error
+    return device, None
+
+
+def clear_model(mac: str) -> bool:
+    """Drop a forced model so the next scan detects the device normally."""
+    with _devices_lock:
+        device = _devices.get(mac)
+        if device is None or device.forced_devtype is None:
+            return False
+        device.forced_devtype = None
+    _persist()
+    return True
 
 
 def add_by_ip(ip: str) -> tuple[Device | None, str | None]:
@@ -244,6 +358,7 @@ def _persist() -> None:
                 "manufacturer": d.manufacturer,
                 "device_class": d.device_class,
                 "manual": d.manual,
+                "forced_devtype": d.forced_devtype,
                 "last_seen": d.last_seen,
             }
             for d in _devices.values()
@@ -275,6 +390,7 @@ def load_persisted() -> None:
                 capabilities=capabilities_for(device_class),
                 online=False,
                 manual=entry.get("manual", False),
+                forced_devtype=entry.get("forced_devtype"),
                 last_seen=entry.get("last_seen"),
             )
         except (KeyError, TypeError, ValueError) as exc:

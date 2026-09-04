@@ -104,7 +104,9 @@ function renderDevices() {
           <span class="device-endpoint">${escapeHtml(device.host)} · ${escapeHtml(device.mac)}</span>
           ${capsHtml ? `<span class="device-caps">${capsHtml}</span>` : ""}
           ${
-            caps.no_learn_reason
+            device.device_class === "Device"
+              ? `<span class="device-unknown">La librería no reconoce este modelo (código ${device.devtype}). Probá elegir el modelo equivalente con el botón Modelo.</span>`
+              : caps.no_learn_reason
               ? `<span class="device-reason">${escapeHtml(caps.no_learn_reason)}</span>`
               : ""
           }
@@ -125,6 +127,14 @@ function renderDevices() {
       device.last_error ? ` title="${escapeHtml(device.last_error)}"` : ""
     }>${statusText}</span>
           ${device.manual ? '<span class="manual-tag">manual</span>' : ""}
+          ${
+            device.forced_devtype
+              ? '<span class="manual-tag" title="El modelo lo elegiste vos, no fue detectado">modelo forzado</span>'
+              : ""
+          }
+          <button type="button" class="secondary model-btn" data-mac="${escapeHtml(
+            device.mac
+          )}" title="Cambiar el modelo con el que se trata este equipo">Modelo</button>
         </span>
       </div>
     `;
@@ -137,6 +147,15 @@ function renderDevices() {
 function initDeviceList() {
   const list = $("#device-list");
   list.addEventListener("click", (event) => {
+    // The Model button sits inside the card, so it has to be handled first or
+    // clicking it would also select the device.
+    const modelButton = event.target.closest(".model-btn");
+    if (modelButton) {
+      event.stopPropagation();
+      openModelModal(modelButton.dataset.mac);
+      return;
+    }
+
     const card = event.target.closest(".device-card");
     if (!card) return;
     selectedMac = card.dataset.mac;
@@ -731,6 +750,84 @@ async function extractDetail(res) {
   return detail;
 }
 
+// --- model override ---------------------------------------------------------
+
+let knownModels = null;
+let modelTargetMac = null;
+
+async function openModelModal(mac) {
+  const device = devices.find((d) => d.mac === mac);
+  if (!device) return;
+  modelTargetMac = mac;
+
+  // Fetched once: the list is 137 entries and never changes at runtime.
+  if (knownModels === null) {
+    const res = await fetch(`${API_BASE}api/models`);
+    knownModels = res.ok ? await res.json() : [];
+  }
+
+  $("#model-current").textContent = device.forced_devtype
+    ? `Ahora está forzado a: ${device.model} (código ${device.forced_devtype}).`
+    : `Detectado como: ${device.model} (código ${device.devtype}).`;
+
+  $("#model-select").innerHTML = knownModels
+    .map((m) => {
+      const caps = [m.learn_ir ? "IR" : null, m.learn_rf ? "RF" : null]
+        .filter(Boolean)
+        .join("+");
+      const selected = m.devtype === (device.forced_devtype || device.devtype);
+      return `<option value="${m.devtype}"${selected ? " selected" : ""}>${escapeHtml(
+        m.manufacturer
+      )} ${escapeHtml(m.model)}${caps ? ` · ${caps}` : ""}</option>`;
+    })
+    .join("");
+
+  $("#model-clear").classList.toggle("hidden", !device.forced_devtype);
+  $("#model-error").classList.add("hidden");
+  $("#model-modal").classList.remove("hidden");
+}
+
+async function applyModel() {
+  const devtype = Number($("#model-select").value);
+  const res = await fetch(`${API_BASE}api/devices/${encodeURIComponent(modelTargetMac)}/model`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ devtype }),
+  });
+  if (!res.ok) {
+    const el = $("#model-error");
+    el.textContent = await extractDetail(res);
+    el.classList.remove("hidden");
+    return;
+  }
+  const data = await res.json();
+  $("#model-modal").classList.add("hidden");
+  // A warning still means the override was stored: the device may just be busy.
+  if (data.warning) window.alert(data.warning);
+  loadDevices();
+}
+
+async function clearModel() {
+  const res = await fetch(`${API_BASE}api/devices/${encodeURIComponent(modelTargetMac)}/model`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    window.alert(await extractDetail(res));
+    return;
+  }
+  $("#model-modal").classList.add("hidden");
+  window.alert("Listo. Buscá de nuevo para que se detecte el modelo real.");
+  loadDevices();
+}
+
+function initModelOverride() {
+  $("#model-apply").addEventListener("click", applyModel);
+  $("#model-clear").addEventListener("click", clearModel);
+  $("#model-cancel").addEventListener("click", () =>
+    $("#model-modal").classList.add("hidden")
+  );
+}
+
 // --- export / import --------------------------------------------------------
 
 let pendingImport = null;
@@ -1083,6 +1180,7 @@ function init() {
   initCodes();
   initLearn();
   initTransfer();
+  initModelOverride();
   initEntities();
   $("#btn-scan").addEventListener("click", runScan);
   $("#add-device-form").addEventListener("submit", submitAddDevice);

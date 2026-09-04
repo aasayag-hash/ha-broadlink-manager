@@ -273,6 +273,27 @@ form select {
   font-size: 0.72rem;
 }
 
+.device-unknown {
+  color: var(--danger);
+  font-size: 0.75rem;
+}
+
+.device-side button.model-btn {
+  padding: 2px 8px;
+  font-size: 0.7rem;
+}
+
+#model-select {
+  width: 100%;
+  max-width: none;
+  font-size: 0.85rem;
+}
+
+#model-error.hidden,
+#model-clear.hidden {
+  display: none;
+}
+
 .device-state {
   font-family: var(--mono);
   font-size: 0.75rem;

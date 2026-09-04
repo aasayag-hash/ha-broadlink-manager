@@ -86,6 +86,17 @@ def read_state(raw: Any) -> tuple[dict[str, Any] | None, str | None]:
         except Exception as exc:  # noqa: BLE001
             return None, f"No se pudo leer el termostato: {exc}"
 
+    # Curtain motors report how far open they are, under two different names:
+    # get_percentage() on dooya/dooya2 and get_position() on wser.
+    for reader in ("get_percentage", "get_position"):
+        method = getattr(raw, reader, None)
+        if callable(method) and not state:
+            try:
+                state["Posición"] = f"{method()} % abierta"
+            except Exception as exc:  # noqa: BLE001
+                return None, f"No se pudo leer la posición: {exc}"
+            break
+
     return (state or None), None
 
 

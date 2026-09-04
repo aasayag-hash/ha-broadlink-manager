@@ -86,13 +86,22 @@ A1 sensor    192.168.1.60    ● online   ·  Temperatura: 24.3 °C · Humedad: 
 
 Si tu Broadlink está en otra VLAN o en una red donde no llega el broadcast, agregalo por IP.
 
-**Qué reconoce.** Las 27 familias y 137 modelos que soporta
-[python-broadlink](https://github.com/mjg59/python-broadlink): controles RM, enchufes SP,
+**Qué reconoce.** El descubrimiento automático encuentra por igual todas las familias, no
+solo los RM: las 27 familias y 137 modelos que soporta
+[python-broadlink](https://github.com/mjg59/python-broadlink) — controles RM, enchufes SP,
 sensores ambientales A1, zapatillas MP1, lámparas LB1/LB2, termostatos Hysen, aires HVAC,
-motores de cortina Dooya, hubs S3 y más. Solo la familia RM aprende códigos; del resto se
-muestran las lecturas que la librería expone (temperatura, humedad, encendido, consumo,
-consigna), en modo **solo lectura** — Home Assistant ya los controla nativamente, y dos
-procesos peleando por el mismo socket es una causa conocida de desconexiones.
+motores de cortina Dooya/Wser, hubs S3 y más.
+
+Solo la familia RM aprende códigos; del resto se muestran las lecturas que la librería
+expone (temperatura, humedad, encendido, consumo, consigna, posición de la cortina), en
+modo **solo lectura** — Home Assistant ya los controla nativamente, y dos procesos peleando
+por el mismo socket es una causa conocida de desconexiones.
+
+**Si tu equipo no aparece bien identificado.** Cuando la librería no reconoce un modelo lo
+muestra como desconocido y no se le puede hacer nada; pasa con clones y con revisiones
+nuevas de hardware. El botón **Modelo** de cada fila permite elegir a mano el modelo
+equivalente, y el add-on lo trata como ese. La elección se guarda y sobrevive a los
+reescaneos.
 
 ### 2. Aprender
 

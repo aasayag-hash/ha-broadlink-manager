@@ -43,6 +43,10 @@ class AddDeviceIn(BaseModel):
     ip: str
 
 
+class SetModelIn(BaseModel):
+    devtype: int
+
+
 class RenameCodeIn(BaseModel):
     subdevice: str
     command: str
@@ -125,6 +129,31 @@ def add_device(payload: AddDeviceIn) -> dict[str, Any]:
 def delete_device(mac: str) -> dict[str, bool]:
     if not discovery.forget(mac):
         raise HTTPException(status_code=404, detail="Dispositivo no encontrado")
+    return {"ok": True}
+
+
+@app.get("/api/models")
+def list_models() -> list[dict[str, Any]]:
+    """Every model the library knows, for overriding a misdetected device."""
+    return discovery.known_models()
+
+
+@app.post("/api/devices/{mac}/model")
+def set_device_model(mac: str, payload: SetModelIn) -> dict[str, Any]:
+    device, error = discovery.set_model(mac, payload.devtype)
+    if device is None:
+        raise HTTPException(status_code=400, detail=error or "No se pudo cambiar el modelo")
+    # A device can come back with an auth error and still be usable once Home
+    # Assistant releases it, so the override is kept and the reason reported.
+    return {"device": device.model_dump(), "warning": error}
+
+
+@app.delete("/api/devices/{mac}/model")
+def clear_device_model(mac: str) -> dict[str, bool]:
+    if not discovery.clear_model(mac):
+        raise HTTPException(
+            status_code=404, detail="Este dispositivo no tiene un modelo forzado"
+        )
     return {"ok": True}
 
 

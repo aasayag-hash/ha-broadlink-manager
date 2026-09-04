@@ -15,7 +15,16 @@ from backend import device_state
 from backend.models import capabilities_for
 
 # Every reader python-broadlink 0.19 exposes across the supported families.
-READER_METHODS = ("check_sensors", "check_power", "get_energy", "get_state", "get_full_status")
+READER_METHODS = (
+    "check_sensors",
+    "check_power",
+    "get_energy",
+    "get_state",
+    "get_full_status",
+    # Curtain motors: dooya/dooya2 and wser name the same thing differently.
+    "get_percentage",
+    "get_position",
+)
 
 
 def test_declared_state_matches_what_the_library_exposes():
@@ -116,10 +125,33 @@ def test_thermostat_uses_get_full_status():
 
 
 def test_a_device_with_no_reader_returns_nothing_rather_than_erroring():
-    """Curtain motors (dooya, wser) expose no reader at all."""
+    """S1C alarm kits and A2 sensors expose no reader at all."""
     state, error = device_state.read_state(Fake())
     assert state is None
     assert error is None
+
+
+def test_curtain_position_is_read():
+    """dooya/dooya2 use get_percentage; wser calls the same thing get_position.
+
+    Both were being missed, so curtain motors showed up with no readings at
+    all -- which reads as an unresponsive device rather than a working one.
+    """
+    state, error = device_state.read_state(Fake(get_percentage=lambda: 60))
+    assert state == {"Posición": "60 % abierta"}
+    assert error is None
+
+    state, _ = device_state.read_state(Fake(get_position=lambda: 0))
+    assert state == {"Posición": "0 % abierta"}
+
+
+def test_a_failing_curtain_read_is_reported():
+    def boom():
+        raise OSError("sin respuesta")
+
+    state, error = device_state.read_state(Fake(get_percentage=boom))
+    assert state is None
+    assert "posición" in error
 
 
 def test_a_failing_read_is_reported_not_raised():
@@ -145,9 +177,10 @@ def test_energy_failure_does_not_lose_the_rest():
     assert error is None
 
 
-@pytest.mark.parametrize("family", ["dooya", "dooya2", "wser"])
+@pytest.mark.parametrize("family", ["dooya", "wser"])
 def test_curtain_motors_explain_themselves(family):
-    """They are detected but have no codes to learn -- say why, not nothing."""
-    reason = capabilities_for(family).no_learn_reason
-    assert "cortina" in reason
-    assert "cover" in reason
+    """No codes to learn, but their position is readable -- say both."""
+    caps = capabilities_for(family)
+    assert caps.read_state is True
+    assert "cortina" in caps.no_learn_reason
+    assert "cover" in caps.no_learn_reason

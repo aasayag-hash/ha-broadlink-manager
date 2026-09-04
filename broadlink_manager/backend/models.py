@@ -39,13 +39,16 @@ STATE_READABLE_CLASSES = {
     "ehc31",
     # get_full_status
     "hysen",
+    # get_percentage / get_position: how far open the curtain is
+    "dooya",
+    "dooya2",
+    "wser",
 }
 
 # Families the library recognises but exposes no reader for. Listed so the UI
 # can say so instead of showing an empty row that looks like a failure.
-# Verified against python-broadlink 0.19: no check_sensors, check_power,
-# get_state or get_full_status on any of these.
-NO_STATE_CLASSES = {"dooya", "dooya2", "wser", "s1c", "a2", "sp1", "rmmini", "rmminib"}
+# Verified against python-broadlink 0.19.
+NO_STATE_CLASSES = {"s1c", "a2", "sp1", "rmmini", "rmminib"}
 
 # Why a device cannot learn, phrased for the user. Keyed by class name prefix so
 # a whole family shares one explanation.
@@ -60,13 +63,18 @@ NO_LEARN_REASONS: dict[str, str] = {
     ),
     "hysen": "Es un termostato: Home Assistant ya lo controla como entidad climate.",
     "hvac": "Es un aire acondicionado: Home Assistant ya lo controla como entidad climate.",
+    # Curtain motors take abrir/cerrar/parar/posición as direct commands over
+    # their own protocol, so there is no code to capture and replay -- but the
+    # position can be read. Home Assistant drives them as a cover entity.
     "dooya": (
-        "Es un motor de cortina: se comunica por su propio protocolo, no con códigos RF que "
-        "se puedan aprender. Home Assistant ya lo controla como entidad cover."
+        "Es un motor de cortina: se maneja con comandos directos (abrir, cerrar, parar, "
+        "posición), no con códigos que se aprendan. Se muestra su posición. Home Assistant "
+        "ya lo controla como entidad cover."
     ),
     "wser": (
-        "Es un motor de cortina: se comunica por su propio protocolo, no con códigos RF que "
-        "se puedan aprender. Home Assistant ya lo controla como entidad cover."
+        "Es un motor de cortina: se maneja con comandos directos (abrir, cerrar, parar, "
+        "posición), no con códigos que se aprendan. Se muestra su posición. Home Assistant "
+        "ya lo controla como entidad cover."
     ),
     "lb": "Es una lámpara: no tiene códigos para aprender. Home Assistant ya la controla.",
     "s1c": "Es un kit de alarma: no tiene códigos para aprender.",
@@ -114,6 +122,9 @@ class Device(BaseModel):
     # Set when the device was added by IP instead of answering the broadcast, so
     # a failed rescan does not drop it from the list.
     manual: bool = False
+    # Set when the user overrode the detected model. Kept so a rescan does not
+    # silently undo the choice, and so the UI can offer to clear it.
+    forced_devtype: int | None = None
     last_seen: float | None = None
     last_error: str | None = None
     # Whatever check_sensors()/check_power() returned on the last poll, already

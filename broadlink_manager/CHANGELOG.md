@@ -13,18 +13,27 @@
 - Se rechazan los archivos que no son un export de este add-on, los de una versión más
   nueva y los que traen códigos mal formados, antes de tocar nada.
 
+- **Cambiar el modelo de un dispositivo a mano.** Si el add-on no reconoce tu equipo (lo
+  muestra como desconocido) o lo reconoce como algo con menos funciones de las que tiene,
+  podés elegir el modelo equivalente de la lista y se va a tratar como ese. La elección
+  queda guardada y sobrevive a los reinicios y a los reescaneos.
+
 **Corregido**
 
-- Faltaba leer el estado de seis familias que la librería sí expone: aires acondicionados
-  (`hvac`), lámparas (`lb1`, `lb2`), enchufes con panel (`bg1`, `ehc31`) y hubs (`s3`).
+- Faltaba leer el estado de nueve familias que la librería sí expone: aires acondicionados
+  (`hvac`), lámparas (`lb1`, `lb2`), enchufes con panel (`bg1`, `ehc31`), hubs (`s3`) y
+  **motores de cortina** (`dooya`, `dooya2`, `wser`, que informan qué tan abiertos están).
   Aparecían en la lista sin ninguna lectura, como si no respondieran.
-- Los motores de cortina (`dooya`, `wser`) ahora explican por qué no tienen códigos para
-  aprender: usan su propio protocolo y Home Assistant ya los maneja como entidad `cover`.
+- La explicación de los motores de cortina decía que no se les puede leer nada, y era
+  falso: no tienen códigos para aprender porque se manejan con comandos directos, pero su
+  posición sí se lee.
 
 **Detalle**
 
 - Quedan cubiertas las **27 familias y 137 modelos** que reconoce la librería: cada una
   declara exactamente lo que se le puede leer o aprender, verificado con tests.
+- El descubrimiento automático funciona igual para todas: los que no son de la familia RM
+  también se detectan solos, con su modelo, su IP y sus lecturas.
 
 ## 0.4.0
 

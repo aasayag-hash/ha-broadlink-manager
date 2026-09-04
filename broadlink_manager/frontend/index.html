@@ -212,6 +212,30 @@
         </div>
       </section>
 
+      <div id="model-modal" class="modal hidden">
+        <div class="modal-content">
+          <h2>Cambiar el modelo</h2>
+          <p class="field-hint">
+            Us&aacute; esto solo si el add-on no reconoce tu equipo, o lo reconoce como algo
+            con menos funciones de las que tiene. Eleg&iacute; el modelo equivalente y se va a
+            tratar como ese.
+          </p>
+          <p id="model-current" class="field-hint"></p>
+          <label>
+            Modelo
+            <select id="model-select" size="12"></select>
+          </label>
+          <p id="model-error" class="error hidden"></p>
+          <div class="actions">
+            <button type="button" id="model-apply">Aplicar</button>
+            <button type="button" id="model-clear" class="secondary">
+              Volver a la detecci&oacute;n
+            </button>
+            <button type="button" id="model-cancel" class="secondary">Cancelar</button>
+          </div>
+        </div>
+      </div>
+
       <div id="import-modal" class="modal hidden">
         <div class="modal-content">
           <h2>Importar c&oacute;digos</h2>
