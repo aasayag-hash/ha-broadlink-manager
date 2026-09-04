@@ -60,9 +60,44 @@
       <section id="tab-codigos" class="tab-panel">
         <div class="codes-panel">
           <h2>C&oacute;digos guardados</h2>
-          <p class="field-hint">Todav&iacute;a no implementado.</p>
+          <div class="codes-toolbar">
+            <input
+              type="search"
+              id="codes-search"
+              placeholder="Buscar por equipo o comando..."
+              autocomplete="off"
+            />
+            <span id="codes-count" class="codes-count"></span>
+          </div>
+          <div id="codes-groups"></div>
         </div>
       </section>
+
+      <div id="edit-modal" class="modal hidden">
+        <div class="modal-content">
+          <h2 id="edit-modal-title">Editar</h2>
+          <form id="edit-form">
+            <p id="edit-error" class="error hidden"></p>
+            <label id="edit-name-label">
+              Nombre
+              <input type="text" id="edit-name" required />
+            </label>
+            <label id="edit-group-label">
+              Equipo
+              <input type="text" id="edit-group" list="group-options" />
+              <datalist id="group-options"></datalist>
+              <small class="field-hint">
+                Cambiar el equipo mueve el c&oacute;digo. Si lo us&aacute;s en automatizaciones,
+                acordate de actualizar el par&aacute;metro <code>device</code>.
+              </small>
+            </label>
+            <div class="actions">
+              <button type="submit">Guardar</button>
+              <button type="button" id="edit-cancel" class="secondary">Cancelar</button>
+            </div>
+          </form>
+        </div>
+      </div>
     </main>
 
     <script src="static/app.js"></script>

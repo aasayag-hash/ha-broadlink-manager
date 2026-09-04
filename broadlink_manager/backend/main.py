@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import device_state, discovery
+from . import device_state, discovery, ha_api, storage
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("broadlink_manager.main")
@@ -30,6 +30,29 @@ _shutdown = threading.Event()
 
 class AddDeviceIn(BaseModel):
     ip: str
+
+
+class RenameCodeIn(BaseModel):
+    subdevice: str
+    command: str
+    new_command: str
+
+
+class MoveCodeIn(BaseModel):
+    subdevice: str
+    command: str
+    new_subdevice: str
+
+
+class RenameGroupIn(BaseModel):
+    subdevice: str
+    new_subdevice: str
+
+
+class SendCodeIn(BaseModel):
+    subdevice: str
+    command: str
+    entity_id: str | None = None
 
 
 @app.get("/api/devices")
@@ -56,6 +79,116 @@ def delete_device(mac: str) -> dict[str, bool]:
     if not discovery.forget(mac):
         raise HTTPException(status_code=404, detail="Dispositivo no encontrado")
     return {"ok": True}
+
+
+@app.get("/api/codes/{mac}")
+def list_codes(mac: str) -> dict[str, Any]:
+    """Return the codes for one Broadlink, grouped by equipment.
+
+    Reads the same file Home Assistant writes, so codes learned earlier through
+    Developer Tools show up here too.
+    """
+    try:
+        codes = storage.read_codes(mac)
+    except storage.StorageError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    groups = [
+        {
+            "subdevice": subdevice,
+            "commands": [
+                {
+                    "command": command,
+                    # A two-item list means the command was learned with the
+                    # 'alternative' flag: HA alternates between both on send.
+                    "toggle": isinstance(code, list),
+                    "preview": (code[0] if isinstance(code, list) else str(code))[:24],
+                }
+                for command in sorted(commands)
+                for code in [commands[command]]
+            ],
+        }
+        for subdevice, commands in sorted(codes.items())
+    ]
+    total = sum(len(g["commands"]) for g in groups)
+    return {"mac": mac, "groups": groups, "total": total}
+
+
+@app.delete("/api/codes/{mac}/{subdevice}/{command}")
+def delete_code(mac: str, subdevice: str, command: str) -> dict[str, bool]:
+    try:
+        storage.delete_code(mac, subdevice, command)
+    except storage.StorageError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True}
+
+
+@app.post("/api/codes/{mac}/rename")
+def rename_code(mac: str, payload: RenameCodeIn) -> dict[str, bool]:
+    try:
+        storage.rename_code(mac, payload.subdevice, payload.command, payload.new_command)
+    except storage.StorageError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True}
+
+
+@app.post("/api/codes/{mac}/move")
+def move_code(mac: str, payload: MoveCodeIn) -> dict[str, bool]:
+    try:
+        storage.move_code(mac, payload.subdevice, payload.command, payload.new_subdevice)
+    except storage.StorageError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True}
+
+
+@app.post("/api/codes/{mac}/rename-group")
+def rename_group(mac: str, payload: RenameGroupIn) -> dict[str, bool]:
+    try:
+        storage.rename_subdevice(mac, payload.subdevice, payload.new_subdevice)
+    except storage.StorageError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True}
+
+
+@app.delete("/api/codes/{mac}/{subdevice}")
+def delete_group(mac: str, subdevice: str) -> dict[str, bool]:
+    try:
+        storage.delete_subdevice(mac, subdevice)
+    except storage.StorageError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True}
+
+
+@app.post("/api/codes/{mac}/send")
+def send_code(mac: str, payload: SendCodeIn) -> dict[str, bool]:
+    """Fire a stored code through Home Assistant.
+
+    Deliberately not sent straight to the hardware: HA owns the Broadlink
+    session, and two processes on the same device socket drop connections.
+    """
+    entity_id = payload.entity_id
+    if not entity_id:
+        entities = ha_api.list_remote_entities()
+        if not entities:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "No se encontró ninguna entidad remote.* en Home Assistant. Configurá la "
+                    "integración Broadlink en Ajustes → Dispositivos y servicios para poder "
+                    "probar códigos desde acá."
+                ),
+            )
+        entity_id = entities[0]
+
+    ok, error = ha_api.send_command(entity_id, payload.subdevice, payload.command)
+    if not ok:
+        raise HTTPException(status_code=502, detail=error or "No se pudo enviar el código")
+    return {"ok": True}
+
+
+@app.get("/api/remote-entities")
+def remote_entities() -> list[str]:
+    return ha_api.list_remote_entities()
 
 
 def _refresh_state() -> None:

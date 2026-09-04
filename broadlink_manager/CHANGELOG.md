@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.2.0
+
+**Nuevo**
+
+- Planilla de códigos agrupada por equipo, con buscador y contador. Lee el mismo archivo
+  que usa Home Assistant, así que también muestra los códigos que hayas aprendido antes
+  por otros medios.
+- Probar un código desde la planilla: se dispara al instante para confirmar que el aparato
+  responde.
+- Renombrar y mover códigos entre equipos, y renombrar o borrar un equipo completo.
+- Los comandos aprendidos con la opción alternativa (toggle) se marcan como tales y se
+  respetan: Home Assistant alterna entre sus dos códigos en cada envío.
+- Antes de cada modificación se guarda un respaldo en
+  `/config/broadlink_manager/backups/`, y la escritura es atómica: un corte de luz no
+  puede dejar el archivo a medias.
+
+**Importante**
+
+- Al renombrar un equipo, las automatizaciones que lo usen en el parámetro `device` de
+  `remote.send_command` siguen apuntando al nombre viejo. La app avisa, pero no puede
+  reescribir tus automatizaciones.
+
 ## 0.1.0
 
 **Nuevo**
