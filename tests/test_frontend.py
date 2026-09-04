@@ -98,6 +98,32 @@ def test_destructive_actions_ask_first(js):
     assert js.count("window.confirm") >= 3
 
 
+# --- per-tab help ----------------------------------------------------------
+
+
+def test_every_tab_explains_itself(html):
+    """Each tab carries its own decision tree, at the foot of its own panel.
+
+    A tab whose help lives only in the README is a tab nobody reads the help
+    for, so this fails rather than letting a new tab ship without one.
+    """
+    panels = re.findall(
+        r'<section id="tab-(\w+)" class="tab-panel[^"]*">(.*?)</section>', html, re.DOTALL
+    )
+    assert len(panels) == 5, f"se esperaban 5 solapas, hay {len(panels)}"
+
+    for tab, body in panels:
+        assert 'class="tab-help"' in body, f"la solapa {tab} no tiene ayuda"
+        assert "<pre>" in body, f"la solapa {tab} no tiene su árbol"
+
+
+def test_the_trees_do_not_wrap(css):
+    """They are drawn with box characters: wrapping breaks them apart."""
+    block = re.search(r"\.tab-help pre \{(.*?)\}", css, re.DOTALL).group(1)
+    assert "white-space: pre" in block
+    assert "overflow-x: auto" in block
+
+
 # --- virtual remote --------------------------------------------------------
 
 

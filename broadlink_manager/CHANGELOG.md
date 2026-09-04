@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.2
+
+**Nuevo**
+
+- **Cada solapa explica cómo funciona, dentro de la app.** Al pie de cada una hay un
+  resumen de para qué sirve y un árbol con las decisiones más comunes: qué hacer si no
+  aparece el Broadlink, cuándo usar IR y cuándo RF, qué pasa si hay nombres repetidos al
+  importar, qué revisar si MQTT no conecta.
+- Va abajo del contenido, siempre visible, así que no tapa los controles pero está a mano
+  cuando hace falta.
+
 ## 0.7.1
 
 **Mejorado**

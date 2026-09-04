@@ -538,6 +538,61 @@ form select {
   margin-top: 12px;
 }
 
+/* Per-tab help ------------------------------------------------------------ */
+
+/* Sits at the foot of each tab, after the working area: always available
+   without pushing the controls down the page. */
+.tab-help {
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.tab-help h3 {
+  margin: 0 0 8px 0;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.tab-help p {
+  margin: 0 0 10px 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  max-width: 70ch;
+}
+
+.tab-help strong {
+  color: var(--text);
+}
+
+.tab-help pre {
+  margin: 0 0 10px 0;
+  padding: 12px 14px;
+  background: #fafbfc;
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  line-height: 1.55;
+  /* The trees are drawn with box characters, so they must not wrap: on a
+     narrow screen they scroll sideways instead of breaking apart. */
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.tab-help-note {
+  font-size: 0.78rem;
+}
+
+.tab-help code {
+  background: var(--neutral-bg);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 0.95em;
+}
+
 /* Virtual remote ---------------------------------------------------------- */
 
 .control-panel {

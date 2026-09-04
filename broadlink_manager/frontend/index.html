@@ -48,6 +48,40 @@
             <ul id="device-list"></ul>
           </div>
         </div>
+
+        <div class="tab-help">
+          <h3>C&oacute;mo funciona esta solapa</h3>
+          <p>
+            Ac&aacute; encontr&aacute;s el hardware. El add-on busca solo al arrancar y cada
+            dos minutos, mandando un mensaje a toda la red. <strong>Eleg&iacute; un
+            dispositivo tocando su fila</strong>: las otras solapas trabajan sobre el que
+            est&eacute; elegido.
+          </p>
+          <pre>
+Abr&iacute;s la solapa
+   │
+   ├─ &iquest;Aparece tu Broadlink?
+   │     S&Iacute; → tocalo para elegirlo. Listo, segu&iacute; en Aprender.
+   │     NO ↓
+   │
+   ├─ Tocá "Buscar" (rebarre todas las interfaces de red)
+   │     &iquest;Aparece? → elegilo
+   │     NO ↓
+   │
+   ├─ &iquest;Est&aacute; en otra VLAN, red de invitados o WiFi aislada?
+   │     → agregalo por IP con el formulario de la izquierda
+   │     (el mensaje de b&uacute;squeda no cruza esas redes)
+   │
+   └─ &iquest;Aparece pero dice "no reconoce este modelo"?
+         → bot&oacute;n Modelo → eleg&iacute; el modelo equivalente
+           (pasa con clones y revisiones nuevas de hardware)</pre>
+          <p class="tab-help-note">
+            Solo la familia RM aprende c&oacute;digos. De los dem&aacute;s (enchufes,
+            sensores, cortinas, termostatos) se muestran sus lecturas, y cada fila explica
+            por qu&eacute; no tiene c&oacute;digos para aprender. Esos ya los controla Home
+            Assistant por su cuenta.
+          </p>
+        </div>
       </section>
 
       <section id="tab-aprender" class="tab-panel">
@@ -123,6 +157,49 @@
             </div>
           </div>
         </div>
+
+        <div class="tab-help">
+          <h3>C&oacute;mo funciona esta solapa</h3>
+          <p>
+            Ac&aacute; le ense&ntilde;&aacute;s al Broadlink los c&oacute;digos de tus
+            controles. El equipo escucha la se&ntilde;al y la guarda tal cual; despu&eacute;s
+            la puede repetir. <strong>IR es un solo paso; RF son dos</strong>, porque primero
+            hay que encontrar en qu&eacute; frecuencia transmite el control.
+          </p>
+          <pre>
+Ten&eacute;s que aprender...
+   │
+   ├─ &iquest;un control entero (TV, aire, port&oacute;n)?
+   │     → eleg&iacute; la plantilla, ponele nombre al equipo,
+   │       y te va pidiendo los botones uno por uno
+   │
+   └─ &iquest;un bot&oacute;n suelto?
+         → Aprender IR   o   Aprender RF
+                │                  │
+                │                  ├─ FASE 1: manten&eacute; apretado el bot&oacute;n
+                │                  │   → detecta la frecuencia
+                │                  │
+                │                  └─ FASE 2: soltá y apretalo una vez, corto
+                │                      → captura el c&oacute;digo
+                │                        (si falla, reintent&aacute;s sin
+                │                         repetir el barrido)
+                │
+                └─ apunt&aacute; el control y apret&aacute; → captura el c&oacute;digo
+                            │
+                            ▼
+                   ┌──────────────────────┐
+                   │   Probar el c&oacute;digo  │ ← &iquest;el aparato reacciona?
+                   └──────────────────────┘
+                      S&Iacute; ↓        NO → Descartar y reintentar
+                   Nombrar y guardar</pre>
+          <p class="tab-help-note">
+            El c&oacute;digo se guarda en el mismo archivo que usa Home Assistant, as&iacute;
+            que qued&aacute; disponible al instante para
+            <code>remote.send_command</code>. Una vez detectada la frecuencia de un control,
+            los dem&aacute;s botones de ese mismo control se aprenden salteando el barrido:
+            de unos 30 segundos a unos 3.
+          </p>
+        </div>
       </section>
 
       <section id="tab-control" class="tab-panel">
@@ -133,6 +210,34 @@
           </div>
           <p id="control-hint" class="field-hint"></p>
           <div id="control-pad"></div>
+        </div>
+
+        <div class="tab-help">
+          <h3>C&oacute;mo funciona esta solapa</h3>
+          <p>
+            Es el control remoto para usar todos los d&iacute;as, tambi&eacute;n desde el
+            celular. Eleg&iacute; el equipo en la lista de arriba y toc&aacute; el bot&oacute;n
+            que quieras enviar. <strong>Ac&aacute; no se modifica nada</strong>: solo
+            dispara.
+          </p>
+          <pre>
+Eleg&iacute;s el equipo en la lista
+   │
+   ▼
+Toc&aacute;s un bot&oacute;n
+   │
+   ├─ se pone VERDE  → el c&oacute;digo sali&oacute;
+   └─ se pone ROJO   → algo fall&oacute;, y te dice qu&eacute;
+
+&iquest;No aparece ning&uacute;n bot&oacute;n?
+   ├─ &iquest;eligi&oacute; un dispositivo en la solapa Dispositivos?
+   └─ &iquest;ese dispositivo ya tiene c&oacute;digos aprendidos?</pre>
+          <p class="tab-help-note">
+            El color queda unos segundos porque un control remoto no informa nada de vuelta:
+            sin eso, una pulsaci&oacute;n que no hizo nada se ver&iacute;a igual que una que
+            funcion&oacute;. Un doble toque no dispara dos veces &mdash; en un port&oacute;n
+            eso ser&iacute;a abrirlo y cerrarlo enseguida.
+          </p>
         </div>
       </section>
 
@@ -153,6 +258,40 @@
             <input type="file" id="import-file" accept=".json,application/json" hidden />
           </div>
           <div id="codes-groups"></div>
+        </div>
+
+        <div class="tab-help">
+          <h3>C&oacute;mo funciona esta solapa</h3>
+          <p>
+            Es la vista de administraci&oacute;n: ac&aacute; se ordena, se corrige y se
+            respalda. Los c&oacute;digos est&aacute;n <strong>agrupados por equipo</strong>,
+            y ese nombre de equipo es exactamente el que va en el par&aacute;metro
+            <code>device</code> de <code>remote.send_command</code>.
+          </p>
+          <pre>
+&iquest;Qu&eacute; quer&eacute;s hacer?
+   │
+   ├─ Ver si un c&oacute;digo funciona          → Probar
+   ├─ Le puse un nombre confuso          → Editar
+   ├─ Lo guard&eacute; en el equipo equivocado  → Editar → cambiar el equipo
+   ├─ Ya no lo uso                       → Borrar
+   │
+   ├─ Todo un equipo qued&oacute; mal nombrado  → Renombrar (fila del grupo)
+   │      ⚠ tus automatizaciones siguen usando el nombre viejo
+   │
+   ├─ Guardar un respaldo / llevarlo a otro HA   → Exportar
+   └─ Traer c&oacute;digos de otra instalaci&oacute;n          → Importar
+            │
+            └─ &iquest;hay nombres repetidos?
+                  → eleg&iacute;s: dejar los tuyos
+                                guardar los dos
+                                reemplazar por los del archivo</pre>
+          <p class="tab-help-note">
+            Ac&aacute; aparecen tambi&eacute;n los c&oacute;digos que hayas aprendido antes
+            por otros medios, porque se lee el mismo archivo que usa Home Assistant. Antes de
+            cada modificaci&oacute;n se guarda un respaldo en
+            <code>/config/broadlink_manager/backups/</code>.
+          </p>
         </div>
       </section>
 
@@ -239,6 +378,41 @@
             </p>
             <ul id="entity-list"></ul>
           </div>
+        </div>
+
+        <div class="tab-help">
+          <h3>C&oacute;mo funciona esta solapa</h3>
+          <p>
+            Ac&aacute; los c&oacute;digos se convierten en <strong>entidades de Home
+            Assistant</strong>, para usarlos en automatizaciones, tableros y por voz.
+            Aparecen solas, sin reiniciar ni escribir YAML, agrupadas bajo el dispositivo
+            Broadlink al que pertenecen.
+          </p>
+          <pre>
+&iquest;Dice "MQTT conectado"?
+   │
+   NO → abr&iacute; "Configuraci&oacute;n del broker MQTT"
+   │      ├─ &iquest;ten&eacute;s el add-on Mosquitto? → se detecta solo,
+   │      │                                     revis&aacute; el error
+   │      └─ &iquest;tu broker est&aacute; en otra m&aacute;quina o puerto?
+   │            → carg&aacute; servidor, puerto, usuario y contrase&ntilde;a
+   │              (al guardar reconecta y te dice si funcion&oacute;)
+   S&Iacute; ↓
+   │
+   └─ &iquest;qu&eacute; quer&eacute;s crear?
+         │
+         ├─ Un c&oacute;digo, una acci&oacute;n
+         │   (abrir el port&oacute;n, apagar la TV)     → Bot&oacute;n
+         │
+         └─ Dos c&oacute;digos, encender y apagar
+             (una luz, un ventilador)             → Interruptor</pre>
+          <p class="tab-help-note">
+            Los interruptores se crean en modo optimista: un control remoto no informa su
+            estado, as&iacute; que Home Assistant muestra lo &uacute;ltimo que se le
+            pidi&oacute;. Al dispararse, la entidad env&iacute;a el c&oacute;digo a
+            trav&eacute;s de Home Assistant y no directo al equipo, para que HA siga siendo el
+            &uacute;nico que mantiene la conexi&oacute;n con el Broadlink.
+          </p>
         </div>
       </section>
 
