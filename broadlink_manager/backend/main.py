@@ -371,17 +371,28 @@ def list_templates() -> list[dict[str, Any]]:
 
 
 @app.get("/api/templates/{template_id}/{mac}")
-def template_progress(template_id: str, mac: str) -> dict[str, Any]:
+def template_progress(template_id: str, mac: str, subdevice: str | None = None) -> dict[str, Any]:
     """A template plus which of its buttons are already learned.
 
-    Computed server-side against .storage so the wizard can be resumed later,
-    and so a code captured outside the wizard still counts as done.
+    Read from .storage rather than tracked in the browser, so the wizard can be
+    resumed after a reload and a code captured outside it still counts as done.
     """
     template = device_templates.get_template(template_id)
     if template is None:
         raise HTTPException(status_code=404, detail="Plantilla no encontrada")
 
-    return {"template": template, "groups": sorted(storage.read_codes(mac))}
+    try:
+        codes = storage.read_codes(mac)
+    except storage.StorageError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    learned = sorted(codes.get(subdevice, {})) if subdevice else []
+    return {
+        "template": template,
+        "groups": sorted(codes),
+        # Which of this template's buttons already exist in that group.
+        "learned": [b["command"] for b in template["buttons"] if b["command"] in learned],
+    }
 
 
 @app.get("/api/export/{mac}")

@@ -158,6 +158,15 @@ function initDeviceList() {
 
     const card = event.target.closest(".device-card");
     if (!card) return;
+    if (card.dataset.mac === selectedMac) return;
+
+    // A wizard belongs to the device it was started on: its group name and
+    // progress mean nothing on another one. Without this the panel stayed
+    // visible and the next capture would learn on the newly selected device
+    // while saving under the previous device's group -- writing into the wrong
+    // .storage file.
+    if (wizard) exitWizard();
+
     selectedMac = card.dataset.mac;
     renderDevices();
     renderLearn();
@@ -238,16 +247,16 @@ function renderLearn() {
   const info = $("#learn-device");
   const device = devices.find((d) => d.mac === selectedMac);
 
-  if (!device) {
-    info.textContent = "Elegí un dispositivo en la pestaña Dispositivos para empezar.";
+  // Both early exits hide the wizard panel too: leaving it up over a device
+  // that cannot learn shows a grid of buttons that only produce errors.
+  if (!device || !device.capabilities.learn_ir) {
+    info.textContent = device
+      ? `${device.model}: ${device.capabilities.no_learn_reason}`
+      : "Elegí un dispositivo en la pestaña Dispositivos para empezar.";
     $("#learn-start").classList.add("hidden");
     $("#wizard-picker").classList.add("hidden");
-    return;
-  }
-  if (!device.capabilities.learn_ir) {
-    info.textContent = `${device.model}: ${device.capabilities.no_learn_reason}`;
-    $("#learn-start").classList.add("hidden");
-    $("#wizard-picker").classList.add("hidden");
+    $("#wizard-panel").classList.add("hidden");
+    wizard = null;
     return;
   }
 
@@ -382,11 +391,14 @@ async function submitSave(event) {
   const errorEl = $("#save-error");
   errorEl.classList.add("hidden");
 
+  // Read before resetLearn() clears the fields further down.
+  const savedGroup = $("#save-group").value.trim();
+
   const res = await fetch(`${API_BASE}api/learn/${encodeURIComponent(selectedMac)}/save`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      subdevice: $("#save-group").value,
+      subdevice: savedGroup,
       command: $("#save-command").value,
     }),
   });
@@ -402,11 +414,14 @@ async function submitSave(event) {
   if (data.frequency) knownFrequency[selectedMac] = data.frequency;
   resetLearn();
 
-  // The codes table has to be reloaded before the wizard redraws: it is what
-  // tells the wizard which buttons are done.
   await loadCodes();
   if (wizard) {
+    // The group field stays editable, so follow whatever was actually saved.
+    // Otherwise the wizard keeps looking in the original group, shows the
+    // button as still missing, and the user learns it a second time.
+    wizard.group = savedGroup || wizard.group;
     wizard.pending = null;
+    await refreshWizardProgress();
     renderWizard();
   } else {
     renderLearn();
@@ -808,21 +823,49 @@ async function loadTemplates() {
 
 async function startWizard(templateId) {
   const name = window.prompt(
-    "¿Cómo querés llamar a este equipo?\n\nVa a agrupar todos sus botones con ese nombre.",
+    "¿Cómo querés llamar a este equipo?\n\nVa a agrupar todos sus botones con ese nombre, y es " +
+      "el que vas a usar en el parámetro device de remote.send_command.",
     ""
   );
   if (!name || !name.trim()) return;
-
-  const res = await fetch(
-    `${API_BASE}api/templates/${encodeURIComponent(templateId)}/${encodeURIComponent(selectedMac)}`
-  );
-  if (!res.ok) {
-    window.alert(await extractDetail(res));
+  // Long names are legal but unwieldy in send_command and in the table.
+  if (name.trim().length > 60) {
+    window.alert("El nombre es demasiado largo. Probá con algo de hasta 60 caracteres.");
     return;
   }
-  const data = await res.json();
-  wizard = { template: data.template, group: name.trim(), pending: null };
+
+  wizard = { template: null, group: name.trim(), pending: null, learned: [] };
+  if (!(await refreshWizardProgress(templateId))) {
+    wizard = null;
+    return;
+  }
   renderWizard();
+}
+
+async function refreshWizardProgress(templateId) {
+  // Progress comes from .storage, not from the codes table in memory: that
+  // table is only populated once the Códigos tab or a device has been opened,
+  // so relying on it showed every button as unlearned and had the user capture
+  // codes that already existed -- silently overwriting them on save.
+  const id = templateId || wizard.template.id;
+  const url =
+    `${API_BASE}api/templates/${encodeURIComponent(id)}/${encodeURIComponent(selectedMac)}` +
+    `?subdevice=${encodeURIComponent(wizard.group)}`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      window.alert(await extractDetail(res));
+      return false;
+    }
+    const data = await res.json();
+    wizard.template = data.template;
+    wizard.learned = data.learned;
+    return true;
+  } catch (err) {
+    window.alert(`No se pudo leer el progreso: ${err}`);
+    return false;
+  }
 }
 
 function exitWizard() {
@@ -833,10 +876,7 @@ function exitWizard() {
 }
 
 function learnedCommands() {
-  // Read from the codes table rather than tracked separately, so a code
-  // captured outside the wizard also counts as done.
-  const group = codeGroups.find((g) => g.subdevice === wizard.group);
-  return new Set(group ? group.commands.map((c) => c.command) : []);
+  return new Set(wizard.learned || []);
 }
 
 function renderWizard() {
@@ -883,24 +923,33 @@ async function wizardCapture(command, label) {
   const device = devices.find((d) => d.mac === selectedMac);
   if (!device) return;
 
-  // RF when the device can do it and the frequency is already known, so the
-  // second button of a remote does not sweep again; IR otherwise.
-  const mode = device.capabilities.learn_rf && knownFrequency[selectedMac] ? "rf" : null;
-  if (!mode) {
-    const chosen = device.capabilities.learn_rf
-      ? window.confirm(
-          `Aprender "${label}".\n\nOK = infrarrojo (control de TV, aire...)\nCancelar = radiofrecuencia (portón, luces 433...)`
-        )
-        ? "ir"
-        : "rf"
-      : "ir";
-    wizard.pending = { command, label };
-    await startLearn(chosen);
-    return;
+  let mode;
+  if (!device.capabilities.learn_rf) {
+    mode = "ir";
+  } else if (knownFrequency[selectedMac]) {
+    // The frequency of this remote is known, so RF skips the sweep: seconds
+    // instead of half a minute per button.
+    mode = "rf";
+  } else {
+    // Typed rather than a confirm dialog: with OK/Cancel, dismissing with Esc
+    // counted as the second option and started a capture nobody asked for.
+    const answer = window.prompt(
+      `Aprender "${label}".\n\n` +
+        "Escribí IR para un control infrarrojo (TV, aire, equipo de música)\n" +
+        "o RF para uno de radiofrecuencia (portón, luces 433 MHz).",
+      "IR"
+    );
+    if (!answer) return;
+    const normalized = answer.trim().toLowerCase();
+    if (normalized !== "ir" && normalized !== "rf") {
+      window.alert(`No entendí "${answer}". Escribí IR o RF.`);
+      return;
+    }
+    mode = normalized;
   }
 
   wizard.pending = { command, label };
-  await startLearn("rf");
+  await startLearn(mode);
 }
 
 function initWizard() {

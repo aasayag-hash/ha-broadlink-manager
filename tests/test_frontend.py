@@ -96,3 +96,59 @@ def test_the_learn_flow_guards_against_double_starts(js):
 def test_destructive_actions_ask_first(js):
     """Deleting a code or a group cannot be undone from the UI."""
     assert js.count("window.confirm") >= 3
+
+
+# --- wizard state, from bugs found in review -------------------------------
+
+
+def test_switching_device_exits_the_wizard(js):
+    """A wizard belongs to the device it was started on.
+
+    Without this the panel stayed up after selecting another Broadlink, and the
+    next capture learned on the new device while saving under the previous
+    device's group -- writing into the wrong .storage file.
+    """
+    handler = re.search(r'closest\("\.device-card"\).*?\n  \}\);', js, re.DOTALL)
+    assert handler, "no se encontró el handler de selección de dispositivo"
+    assert "exitWizard()" in handler.group(0)
+
+
+def test_a_device_that_cannot_learn_hides_the_wizard_panel(js):
+    """Otherwise a grid of buttons is shown over a device that only errors."""
+    render = re.search(r"function renderLearn\(\).*?\n\}", js, re.DOTALL).group(0)
+    assert '$("#wizard-panel").classList.add("hidden")' in render
+    assert "wizard = null" in render
+
+
+def test_wizard_progress_comes_from_the_backend(js):
+    """Read from .storage, not from the in-memory codes table.
+
+    That table is only filled once the Códigos tab or a device has been opened,
+    so relying on it showed every button as unlearned and had the user
+    re-capture codes that already existed, overwriting them on save.
+    """
+    learned = re.search(r"function learnedCommands\(\).*?\n\}", js, re.DOTALL).group(0)
+    assert "wizard.learned" in learned
+    assert "codeGroups" not in learned
+    assert "refreshWizardProgress" in js
+
+
+def test_saving_follows_an_edited_group_name(js):
+    """The group field stays editable, so the wizard has to track what was saved.
+
+    Otherwise it keeps looking in the original group, shows the button as still
+    missing, and the user learns it twice into two different groups.
+    """
+    submit = re.search(r"async function submitSave.*?\n\}", js, re.DOTALL).group(0)
+    assert "savedGroup" in submit
+    assert "wizard.group = savedGroup" in submit
+
+
+def test_the_ir_rf_choice_cannot_be_answered_by_dismissing(js):
+    """A confirm dialog treated Esc as the second option and started a capture.
+
+    Anything other than an explicit IR or RF now aborts.
+    """
+    capture = re.search(r"async function wizardCapture.*?\n\}", js, re.DOTALL).group(0)
+    assert "window.confirm" not in capture
+    assert 'normalized !== "ir"' in capture
